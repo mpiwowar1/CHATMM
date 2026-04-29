@@ -1,9 +1,10 @@
-import LoginScreen from "./LoginScreen"
+import LoginScreen from "./components/LoginScreen"
+import RegisterForm from "./components/RegisterForm"
 
 export function App() {
   return (
     <>
-      <LoginScreen></LoginScreen>
+      <RegisterForm></RegisterForm>
     </>
   )
 }
