@@ -1,0 +1,10 @@
+node_modules/
+dist/
+build/
+.vite/
+.cache/
+npm-debug.log*
+.idea/
+.vscode/
+.DS_Store
+README.md
