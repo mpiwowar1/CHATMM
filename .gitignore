@@ -1,0 +1,14 @@
+# Environment
+.env
+
+# Docker
+postgres_data/
+*.log
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+.vscode/
