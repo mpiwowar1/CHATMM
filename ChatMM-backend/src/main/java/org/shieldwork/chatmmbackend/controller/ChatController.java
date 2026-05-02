@@ -4,6 +4,7 @@ import org.shieldwork.chatmmbackend.dto.request.ChatMessagePayload;
 import org.shieldwork.chatmmbackend.dto.response.ChatMessageResponse;
 import org.shieldwork.chatmmbackend.service.ChatMessageService;
 import lombok.RequiredArgsConstructor;
+import org.shieldwork.chatmmbackend.service.NotificationService;
 import org.springframework.messaging.handler.annotation.MessageMapping;
 import org.springframework.messaging.handler.annotation.Payload;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
@@ -16,6 +17,7 @@ public class ChatController {
 
     private final SimpMessagingTemplate messagingTemplate;
     private final ChatMessageService chatMessageService;
+    private final NotificationService notificationService;
 
     @MessageMapping("/chat.send")
     public void sendMessage(@Payload ChatMessagePayload payload, Authentication authentication) {
@@ -25,7 +27,12 @@ public class ChatController {
 
         String destination = "/topic/conversation." + payload.getConversationId();
         messagingTemplate.convertAndSend(destination, response);
-    }
 
-    // notification
+        notificationService.sendNewMessageNotification(
+                payload.getConversationId(),
+                response.getSenderId(),
+                response.getSenderName(),
+                senderEmail
+        );
+    }
 }
