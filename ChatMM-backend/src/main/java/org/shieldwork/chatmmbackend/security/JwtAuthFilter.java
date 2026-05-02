@@ -74,12 +74,10 @@ public class JwtAuthFilter extends OncePerRequestFilter {
         } catch (ExpiredJwtException ex) {
             // most important
             exceptionResolver.resolveException(request, response, null, ex);
+            return;
         } catch (Exception ex) {
-            //SignatureException
-            //MalformedJwtException
-            //UnsupportedJwtException
-            //IllegalArgumentException
-            // https://javadoc.io/doc/io.jsonwebtoken/jjwt/0.4/io/jsonwebtoken/JwtException.html
+            exceptionResolver.resolveException(request, response, null, ex);
+            return;
         }
 
         filterChain.doFilter(request, response);
