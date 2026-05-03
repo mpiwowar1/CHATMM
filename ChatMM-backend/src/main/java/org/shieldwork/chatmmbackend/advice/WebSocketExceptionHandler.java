@@ -29,6 +29,7 @@ public class WebSocketExceptionHandler {
         return buildErrorResponse("about:blank", HttpStatus.BAD_REQUEST, "Invalid Payload", ex.getMessage(), "stomp-message-handler");
     }
 
+    @MessageExceptionHandler(Exception.class)
     @SendToUser("/queue/errors")
     public ErrorResponse handleGlobalException(Exception ex) {
         return buildErrorResponse("about:blank", HttpStatus.INTERNAL_SERVER_ERROR, "Internal Server Error", "An unexpected error occurred while processing the WebSocket message.", "stomp-message-handler");
