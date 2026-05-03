@@ -31,7 +31,7 @@ public class Participant {
     private String encryptedAesKey;
 
     @Enumerated(EnumType.STRING)
-//    @Column(nullable = false)
+    @Column(nullable = false)
     private ParticipantRole role;
 
     @Column(nullable = false, updatable = false)
