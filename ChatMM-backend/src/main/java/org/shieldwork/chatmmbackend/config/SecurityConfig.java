@@ -57,7 +57,6 @@ public class SecurityConfig {
 
         configuration.setAllowedHeaders(List.of("Authorization", "Content-Type"));
 
-
         // configuration.setAllowCredentials(true); // XSS, CSRF attack
 
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
