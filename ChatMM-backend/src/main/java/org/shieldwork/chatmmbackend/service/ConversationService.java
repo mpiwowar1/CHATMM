@@ -114,6 +114,7 @@ public class ConversationService {
                         .id(p.getConversation().getId())
                         .name(p.getConversation().getName())
                         .type(p.getConversation().getType())
+                        .encryptedAesKey(p.getEncryptedAesKey())
                         .build())
                 .toList();
     }

@@ -10,6 +10,7 @@ public class ConversationSummaryResponse {
     private Long id;
     private String name;
     private ConversationType type;
+    private String encryptedAesKey;
 
     // message info
 }
