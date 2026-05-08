@@ -22,8 +22,7 @@ import java.nio.charset.StandardCharsets;
 @RequiredArgsConstructor
 public class StompErrorHandler extends StompSubProtocolErrorHandler {
 
-    // "Could not autowire. No beans of 'ObjectMapper' type found."
-    private final ObjectMapper objectMapper = new ObjectMapper();
+    private final ObjectMapper objectMapper;
 
     @Override
     public Message<byte[]> handleClientMessageProcessingError(Message<byte[]> clientMessage, @NonNull Throwable ex) {
