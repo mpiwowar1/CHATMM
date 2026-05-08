@@ -6,7 +6,7 @@ import {
   SidebarHeader,
 } from "@/components/ui/sidebar"
 
-export function AppSidebar() {
+export function MainSidebar() {
   return (
     <Sidebar>
       <SidebarHeader />

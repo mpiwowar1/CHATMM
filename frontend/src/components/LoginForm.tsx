@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { useLogin } from "../hooks/useLogin"
 import { Button } from "@/components/ui/button"
 import {
@@ -15,6 +15,7 @@ import { Label } from "@/components/ui/label"
 
 interface LoginFormProps {
   onSwitchToRegister: () => void
+  onLoggingIn?: () => void
 }
 
 type Fields = {
@@ -22,13 +23,22 @@ type Fields = {
   password: string
 }
 
-export default function LoginForm({ onSwitchToRegister }: LoginFormProps) {
+export default function LoginForm({
+  onSwitchToRegister,
+  onLoggingIn,
+}: LoginFormProps) {
   const [fields, setFields] = useState<Fields>({
     email: "",
     password: "",
   })
 
   const { login, status, error, authData } = useLogin()
+
+  useEffect(() => {
+    if (status === "success") {
+      onLoggingIn?.()
+    }
+  }, [status, onLoggingIn])
 
   const onChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target
