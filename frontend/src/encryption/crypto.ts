@@ -5,13 +5,13 @@ const b64 = (buf: ArrayBuffer | Uint8Array): string => {
   return btoa(String.fromCharCode(...bytes))
 }
 
-export function generateSalt(): Uint8Array<ArrayBuffer> {
-  return crypto.getRandomValues(new Uint8Array(16)) as Uint8Array<ArrayBuffer>
+export function generateSalt(): Uint8Array {
+  return crypto.getRandomValues(new Uint8Array(16))
 }
 
 export async function deriveKeyFromPassword(
   password: string,
-  salt: Uint8Array<ArrayBuffer>
+  salt: Uint8Array
 ): Promise<CryptoKey> {
   const enc = new TextEncoder().encode(password)
 
@@ -22,7 +22,7 @@ export async function deriveKeyFromPassword(
   return subtle.deriveKey(
     {
       name: "PBKDF2",
-      salt,
+      salt: salt,
       iterations: 310_000,
       hash: "SHA-256",
     },
@@ -31,7 +31,7 @@ export async function deriveKeyFromPassword(
       name: "AES-GCM",
       length: 256,
     },
-    false,
+    true,
     ["encrypt", "decrypt"]
   )
 }
@@ -76,8 +76,8 @@ export interface RegistrationPayload {
   name: string
   email: string
   password: string
-  salt: string
-  rsaPublicKey: string
+  frontSalt: string
+  publicKey: string
   encryptedPrivateKey: string
 }
 
@@ -97,8 +97,8 @@ export async function buildRegistrationPayload(
     email,
     name,
     password,
-    salt: b64(salt),
-    rsaPublicKey: b64(spki),
+    frontSalt: b64(salt),
+    publicKey: b64(spki),
     encryptedPrivateKey: await encryptPrivateKey(privateKey, wrappingKey),
   }
 }

@@ -1,5 +1,5 @@
 import { useState } from "react"
-import { useRegister } from "../hooks/useRegister"
+import { useLogin } from "../hooks/useLogin"
 import { Button } from "@/components/ui/button"
 import {
   Card,
@@ -13,24 +13,22 @@ import {
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 
+interface LoginFormProps {
+  onSwitchToRegister: () => void
+}
+
 type Fields = {
-  name: string
   email: string
   password: string
 }
 
-interface RegisterFormProps {
-  onSwitchToLogin: () => void
-}
-
-export default function RegisterForm({ onSwitchToLogin }: RegisterFormProps) {
+export default function LoginForm({ onSwitchToRegister }: LoginFormProps) {
   const [fields, setFields] = useState<Fields>({
-    name: "",
     email: "",
     password: "",
   })
 
-  const { register, status, error } = useRegister()
+  const { login, status, error, authData } = useLogin()
 
   const onChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target
@@ -42,25 +40,45 @@ export default function RegisterForm({ onSwitchToLogin }: RegisterFormProps) {
   }
 
   const onSubmit = async () => {
-    if (fields.name && fields.email && fields.password) {
-      await register(fields)
+    if (fields.email && fields.password) {
+      await login(fields)
     }
-    return
   }
 
   const loading = status === "loading"
+
+  // If login successful, show welcome message
+  if (status === "success" && authData) {
+    return (
+      <div className="flex min-h-screen items-center justify-center">
+        <Card className="w-full max-w-sm">
+          <CardHeader>
+            <CardTitle>Welcome back!</CardTitle>
+            <CardDescription>
+              You are logged in as {authData.name}
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm font-medium text-green-600">
+              Login successful. Redirecting...
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+    )
+  }
 
   return (
     <div className="flex min-h-screen items-center justify-center">
       <Card className="w-full max-w-sm">
         <CardHeader>
-          <CardTitle>Register an account</CardTitle>
+          <CardTitle>Login to your account</CardTitle>
           <CardDescription>
-            Enter your Username, Email and password to register.
+            Enter your email below to login to your account
           </CardDescription>
           <CardAction>
-            <Button variant="link" onClick={onSwitchToLogin}>
-              Log in
+            <Button variant="link" onClick={onSwitchToRegister}>
+              Sign Up
             </Button>
           </CardAction>
         </CardHeader>
@@ -68,20 +86,10 @@ export default function RegisterForm({ onSwitchToLogin }: RegisterFormProps) {
           <form>
             <div className="flex flex-col gap-6">
               <div className="grid gap-2">
-                <Label htmlFor="email">Username</Label>
-                <Input
-                  name="name"
-                  type="name"
-                  placeholder="Username"
-                  onChange={onChange}
-                  value={fields.name}
-                  required
-                />
-              </div>
-              <div className="grid gap-2">
                 <Label htmlFor="email">Email</Label>
                 <Input
                   name="email"
+                  id="email"
                   type="email"
                   placeholder="m@example.com"
                   onChange={onChange}
@@ -92,11 +100,19 @@ export default function RegisterForm({ onSwitchToLogin }: RegisterFormProps) {
               <div className="grid gap-2">
                 <div className="flex items-center">
                   <Label htmlFor="password">Password</Label>
+                  <a
+                    href="#"
+                    className="ml-auto inline-block text-sm underline-offset-4 hover:underline"
+                  >
+                    Forgot your password?
+                  </a>
                 </div>
                 <Input
+                  id="password"
                   name="password"
-                  onChange={onChange}
                   type="password"
+                  onChange={onChange}
+                  value={fields.password}
                   required
                 />
               </div>
@@ -110,13 +126,8 @@ export default function RegisterForm({ onSwitchToLogin }: RegisterFormProps) {
             className="w-full"
             disabled={loading}
           >
-            {loading ? "Generating keys…" : "Register"}
+            {loading ? "Deriving keys…" : "Login"}
           </Button>
-          {status === "success" && (
-            <p className="text-sm font-medium text-green-600">
-              Account created!
-            </p>
-          )}
           {error && (
             <p role="alert" className="text-sm font-medium text-red-600">
               {error}

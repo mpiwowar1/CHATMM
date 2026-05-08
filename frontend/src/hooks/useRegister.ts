@@ -1,5 +1,6 @@
 import { useState } from "react"
 import { buildRegistrationPayload } from "../encryption/crypto"
+import { baseip } from "../encryption/ip"
 
 type Status = "idle" | "loading" | "success" | "error"
 
@@ -24,7 +25,7 @@ export function useRegister() {
     try {
       const payload = await buildRegistrationPayload(name, email, password)
 
-      const res = await fetch("/register", {
+      const res = await fetch(baseip + "/auth/register", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
@@ -38,10 +39,17 @@ export function useRegister() {
           if (
             typeof data === "object" &&
             data !== null &&
-            "message" in data &&
-            typeof (data as any).message === "string"
+            "detail" in data &&
+            typeof (data as any).detail === "string"
           ) {
-            message = (data as any).message
+            message = (data as any).detail
+          } else if (
+            typeof data === "object" &&
+            data !== null &&
+            "title" in data &&
+            typeof (data as any).title === "string"
+          ) {
+            message = (data as any).title
           }
         } catch {
           // ignore JSON parse errors
