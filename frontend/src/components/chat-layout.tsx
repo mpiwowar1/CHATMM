@@ -7,6 +7,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Separator } from "@/components/ui/separator"
 import {
@@ -16,7 +17,6 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip"
 import {
-  MessageSquare,
   Search,
   Settings,
   Plus,
@@ -24,9 +24,17 @@ import {
   Send,
   Paperclip,
   Smile,
-  ChevronDown,
   Circle,
 } from "lucide-react"
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetDescription,
+  SheetTrigger,
+} from "@/components/ui/sheet"
+import { baseip } from "@/encryption/ip"
 import { cn } from "@/lib/utils"
 
 // ─────────────────────────────────────────────
@@ -192,13 +200,41 @@ export function Sidebar({
   conversations,
   activeId,
   onSelect,
+  onCreateConversation,
 }: {
   currentUser: User
   conversations: Conversation[]
   activeId: string
   onSelect: (id: string) => void
+  onCreateConversation: (
+    name: string,
+    participantEmails: string
+  ) => Promise<void>
 }) {
   const [search, setSearch] = useState("")
+  const [sheetOpen, setSheetOpen] = useState(false)
+  const [newConversationName, setNewConversationName] = useState("")
+  const [participantEmails, setParticipantEmails] = useState("")
+  const [creating, setCreating] = useState(false)
+  const [createError, setCreateError] = useState<string | null>(null)
+
+  const handleCreateConversation = async () => {
+    setCreateError(null)
+    setCreating(true)
+
+    try {
+      await onCreateConversation(newConversationName, participantEmails)
+      setNewConversationName("")
+      setParticipantEmails("")
+      setSheetOpen(false)
+    } catch (err: unknown) {
+      setCreateError(
+        err instanceof Error ? err.message : "Failed to create conversation"
+      )
+    } finally {
+      setCreating(false)
+    }
+  }
 
   const filtered = conversations.filter((c) =>
     c.name.toLowerCase().includes(search.toLowerCase())
@@ -209,9 +245,54 @@ export function Sidebar({
       {/* Header */}
       <div className="flex items-center justify-between px-4 pt-5 pb-3">
         <h1 className="text-lg font-semibold tracking-tight">Messages</h1>
-        <Button variant="ghost" size="icon" className="h-8 w-8">
-          <Plus className="h-4 w-4" />
-        </Button>
+        <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
+          <SheetTrigger asChild>
+            <Button variant="ghost" size="icon" className="h-8 w-8">
+              <Plus className="h-4 w-4" />
+            </Button>
+          </SheetTrigger>
+          <SheetContent side="right" className="w-[400px]">
+            <SheetHeader>
+              <SheetTitle>New conversation</SheetTitle>
+              <SheetDescription>
+                Create a direct or group chat by adding participant emails.
+              </SheetDescription>
+            </SheetHeader>
+            <div className="space-y-4 p-4">
+              <div className="space-y-2">
+                <Label htmlFor="conversation-name">Conversation name</Label>
+                <Input
+                  id="conversation-name"
+                  placeholder="Project team, Friends"
+                  value={newConversationName}
+                  onChange={(e) => setNewConversationName(e.target.value)}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="participant-emails">Participant emails</Label>
+                <Input
+                  id="participant-emails"
+                  placeholder="alice@example.com, bob@example.com"
+                  value={participantEmails}
+                  onChange={(e) => setParticipantEmails(e.target.value)}
+                />
+                <p className="text-sm text-muted-foreground">
+                  Enter one or more emails separated by commas.
+                </p>
+              </div>
+              {createError ? (
+                <p className="text-sm text-red-600">{createError}</p>
+              ) : null}
+              <Button
+                className="w-full"
+                onClick={handleCreateConversation}
+                disabled={creating}
+              >
+                {creating ? "Creating..." : "Create conversation"}
+              </Button>
+            </div>
+          </SheetContent>
+        </Sheet>
       </div>
 
       {/* Search */}
@@ -484,146 +565,188 @@ export function ChatArea({
 // ChatLayout — root layout combining both panels
 // ─────────────────────────────────────────────
 
-export function ChatLayout() {
-  // ── Sample data ──────────────────────────────
-  const currentUser: User = {
-    id: "me",
-    name: "Alex Morgan",
-    status: "online",
-    role: "Developer",
-  }
-
-  const otherUsers: Record<string, User> = {
-    u1: { id: "u1", name: "Sara Kim", status: "online" },
-    u2: { id: "u2", name: "James Lee", status: "away" },
-    u3: { id: "u3", name: "Priya Das", status: "online" },
-    u4: { id: "u4", name: "Tom Blake", status: "offline" },
-  }
-
-  const allUsers: Record<string, User> = {
-    me: currentUser,
-    ...otherUsers,
-  }
-
-  const conversations: Conversation[] = [
-    {
-      id: "c1",
-      name: "Sara Kim",
-      lastMessage: "Sounds great, talk later!",
-      lastMessageTime: new Date(Date.now() - 3 * 60000),
-      unreadCount: 2,
-    },
-    {
-      id: "c2",
-      name: "James Lee",
-      lastMessage: "Can you review the PR?",
-      lastMessageTime: new Date(Date.now() - 22 * 60000),
-      unreadCount: 0,
-    },
-    {
-      id: "c3",
-      name: "Priya Das",
-      lastMessage: "The meeting is at 3pm",
-      lastMessageTime: new Date(Date.now() - 60 * 60000),
-      unreadCount: 0,
-    },
-    {
-      id: "c4",
-      name: "Tom Blake",
-      lastMessage: "Thanks!",
-      lastMessageTime: new Date(Date.now() - 5 * 3600000),
-      unreadCount: 0,
-    },
-  ]
-
-  const sampleMessages: Message[] = [
-    {
-      id: "m1",
-      senderId: "u1",
-      text: "Hey! Did you finish the design review?",
-      timestamp: new Date(Date.now() - 15 * 60000),
-      isOwn: false,
-    },
-    {
-      id: "m2",
-      senderId: "me",
-      text: "Almost done, just checking spacing on mobile.",
-      timestamp: new Date(Date.now() - 14 * 60000),
-      isOwn: true,
-    },
-    {
-      id: "m3",
-      senderId: "u1",
-      text: "Nice. Let me know when you push it.",
-      timestamp: new Date(Date.now() - 13 * 60000),
-      isOwn: false,
-    },
-    {
-      id: "m4",
-      senderId: "u1",
-      text: "Also, the shadcn components look really clean 👌",
-      timestamp: new Date(Date.now() - 12 * 60000),
-      isOwn: false,
-    },
-    {
-      id: "m5",
-      senderId: "me",
-      text: "Thanks! Used the new ScrollArea and Separator — super easy.",
-      timestamp: new Date(Date.now() - 10 * 60000),
-      isOwn: true,
-    },
-    {
-      id: "m6",
-      senderId: "u1",
-      text: "Sounds great, talk later!",
-      timestamp: new Date(Date.now() - 3 * 60000),
-      isOwn: false,
-    },
-  ]
-
-  // ── State ─────────────────────────────────────
-  const [activeId, setActiveId] = useState("c1")
+export function ChatLayout({
+  currentUser,
+  conversations,
+}: {
+  currentUser: User
+  conversations: Conversation[]
+}) {
+  const [conversationList, setConversationList] = useState(conversations)
+  const [activeId, setActiveId] = useState(conversations[0]?.id ?? "")
   const [messagesByConv, setMessagesByConv] = useState<
     Record<string, Message[]>
-  >({
-    c1: sampleMessages,
-    c2: [],
-    c3: [],
-    c4: [],
-  })
+  >(() =>
+    conversations.reduce(
+      (acc, conversation) => {
+        acc[conversation.id] = []
+        return acc
+      },
+      {} as Record<string, Message[]>
+    )
+  )
+  useEffect(() => {
+    setConversationList(conversations)
+    if (
+      conversations.length > 0 &&
+      !conversations.some((c) => c.id === activeId)
+    ) {
+      setActiveId(conversations[0].id)
+    }
+  }, [conversations])
 
-  const activeConversation = conversations.find((c) => c.id === activeId)!
-  const activeMessages = messagesByConv[activeId] ?? []
+  useEffect(() => {
+    setMessagesByConv((prev) => {
+      const next = { ...prev }
+      conversationList.forEach((conversation) => {
+        if (!(conversation.id in next)) {
+          next[conversation.id] = []
+        }
+      })
+      return next
+    })
+  }, [conversationList])
+
+  const activeConversation =
+    conversationList.find((conversation) => conversation.id === activeId) ??
+    conversationList[0]
+
+  const handleCreateConversation = async (
+    name: string,
+    participants: string
+  ) => {
+    const trimmedName = name.trim()
+    if (!trimmedName) {
+      throw new Error("Conversation name is required")
+    }
+
+    const participantEmails = participants
+      .split(",")
+      .map((email) => email.trim())
+      .filter(Boolean)
+
+    if (participantEmails.length === 0) {
+      throw new Error("Add at least one participant email")
+    }
+
+    const token = localStorage.getItem("accessToken")
+    if (!token) {
+      throw new Error("Not authenticated")
+    }
+
+    const participantUsers = await Promise.all(
+      participantEmails.map(async (email) => {
+        const res = await fetch(
+          `${baseip}/users/search?email=${encodeURIComponent(email)}`,
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+              "Content-Type": "application/json",
+            },
+          }
+        )
+
+        if (!res.ok) {
+          throw new Error(`User not found: ${email}`)
+        }
+
+        return res.json() as Promise<{ id: number }>
+      })
+    )
+
+    const participantKeys: Record<string, string> = {
+      [currentUser.id]: "dummy-key",
+    }
+
+    participantUsers.forEach((user) => {
+      participantKeys[String(user.id)] = "dummy-key"
+    })
+
+    const createRes = await fetch(`${baseip}/conversations`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        name: trimmedName,
+        participantKeys,
+      }),
+    })
+
+    if (!createRes.ok) {
+      const data = await createRes.json().catch(() => null)
+      const message =
+        data && typeof data === "object" && "detail" in data
+          ? (data as any).detail
+          : "Failed to create conversation"
+      throw new Error(message)
+    }
+
+    const body = (await createRes.json()) as { id: number }
+    const newConversation: Conversation = {
+      id: String(body.id),
+      name: trimmedName,
+      lastMessage: "",
+      lastMessageTime: new Date(),
+      unreadCount: 0,
+    }
+
+    setConversationList((current) => [...current, newConversation])
+    setActiveId(String(body.id))
+  }
+
+  const activeMessages =
+    activeConversation && messagesByConv[activeConversation.id]
+      ? messagesByConv[activeConversation.id]
+      : []
 
   const handleSend = (text: string) => {
+    if (!activeConversation) return
     const newMsg: Message = {
       id: crypto.randomUUID(),
-      senderId: "me",
+      senderId: currentUser.id,
       text,
       timestamp: new Date(),
       isOwn: true,
     }
     setMessagesByConv((prev) => ({
       ...prev,
-      [activeId]: [...(prev[activeId] ?? []), newMsg],
+      [activeConversation.id]: [...(prev[activeConversation.id] ?? []), newMsg],
     }))
+  }
+
+  const allUsers: Record<string, User> = {
+    [currentUser.id]: currentUser,
   }
 
   return (
     <div className="flex h-screen overflow-hidden bg-background text-foreground">
       <Sidebar
         currentUser={currentUser}
-        conversations={conversations}
-        activeId={activeId}
+        conversations={conversationList}
+        activeId={activeConversation?.id ?? ""}
         onSelect={setActiveId}
+        onCreateConversation={handleCreateConversation}
       />
 
-      <ChatArea
-        conversation={activeConversation}
-        messages={activeMessages}
-        users={allUsers}
-        onSend={handleSend}
-      />
+      {activeConversation ? (
+        <ChatArea
+          conversation={activeConversation}
+          messages={activeMessages}
+          users={allUsers}
+          onSend={handleSend}
+        />
+      ) : (
+        <div className="flex flex-1 flex-col items-center justify-center p-8 text-center">
+          <div className="rounded-2xl border bg-card p-8 shadow-lg">
+            <h2 className="text-xl font-semibold">No conversations yet</h2>
+            <p className="mt-2 text-sm text-muted-foreground">
+              Create your first conversation using the plus button in the sidebar.
+            </p>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
