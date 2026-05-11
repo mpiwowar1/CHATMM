@@ -96,6 +96,11 @@ public class RestExceptionHandler {
         return buildResponse("about:blank", HttpStatus.CONFLICT, "Data Conflict", "The action could not be completed due to a conflict with existing data (e.g., duplicate record).", request.getRequestURI());
     }
 
+    @ExceptionHandler(org.springframework.security.core.AuthenticationException.class)
+    public ResponseEntity<ErrorResponse> handleAuthenticationException(Exception ex, HttpServletRequest request) {
+        return buildResponse("about:blank", HttpStatus.UNAUTHORIZED, "Unauthorized", "Full authentication is required to access this resource.", request.getRequestURI());
+    }
+
     private ResponseEntity<ErrorResponse> buildResponse(String type, HttpStatus status, String title, String detail, String instance) {
         ErrorResponse errorResponse = ErrorResponse.builder()
                 .type(type)
