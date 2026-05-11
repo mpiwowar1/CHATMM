@@ -22,8 +22,17 @@ public class Conversation {
     private String name;
 
     @Enumerated(EnumType.STRING)
-//    @Column(nullable = false)
+    @Column(nullable = false)
     private ConversationType type;
+
+    private LocalDateTime lastMessageAt;
+
+    @Column(columnDefinition = "TEXT")
+    private String lastMessagePreview;
+
+    private String lastMessageIv;
+
+    private String lastMessageSenderName;
 
     @Column(nullable = false, updatable = false)
     private LocalDateTime createdAt;
@@ -31,5 +40,6 @@ public class Conversation {
     @PrePersist
     protected void onCreate() {
         this.createdAt = LocalDateTime.now();
+        this.lastMessageAt = this.createdAt;
     }
 }

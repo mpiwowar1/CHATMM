@@ -9,6 +9,7 @@ import org.shieldwork.chatmmbackend.service.ChatMessageService;
 import org.shieldwork.chatmmbackend.service.ConversationService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
@@ -65,11 +66,15 @@ public class ConversationController {
     }
 
     @GetMapping
-    public ResponseEntity<List<ConversationSummaryResponse>> getUserConversations(
+    public ResponseEntity<Page<ConversationSummaryResponse>> getUserConversations(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size,
             Authentication authentication
     ) {
         String userEmail = authentication.getName();
-        List<ConversationSummaryResponse> conversations = conversationService.getUserConversations(userEmail);
-        return ResponseEntity.ok(conversations);
+
+        Page<ConversationSummaryResponse> conversationsPage = conversationService.getUserConversations(userEmail, page, size);
+
+        return ResponseEntity.ok(conversationsPage);
     }
 }

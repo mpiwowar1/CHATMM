@@ -56,6 +56,12 @@ public class ChatMessageService {
 
         Message savedMessage = messageRepository.save(message);
 
+        conversation.setLastMessageAt(savedMessage.getTimestamp());
+        conversation.setLastMessagePreview(payload.getCiphertext());
+        conversation.setLastMessageIv(payload.getIv());
+        conversation.setLastMessageSenderName(sender.getName());
+        conversationRepository.save(conversation);
+
         return ChatMessageResponse.builder()
                 .id(savedMessage.getId())
                 .conversationId(conversation.getId())
