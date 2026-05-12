@@ -27,10 +27,8 @@ export function useLogin() {
     setError(null)
 
     try {
-      // Step 1: Generate device ID for this session
       const deviceId = `device_${Date.now()}_${Math.random().toString(36).substring(2, 15)}`
 
-      // Step 2: Send login request with the raw password
       const loginRes = await fetch(baseip + "/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -62,7 +60,6 @@ export function useLogin() {
             message = (data as any).title
           }
         } catch {
-          // ignore JSON parse errors
         }
 
         throw new Error(message)
@@ -70,7 +67,7 @@ export function useLogin() {
 
       const data: AuthResponse = await loginRes.json()
 
-      // Store tokens and user data
+  
       localStorage.setItem("accessToken", data.accessToken)
       localStorage.setItem("refreshToken", data.refreshToken)
       localStorage.setItem(

@@ -52,7 +52,6 @@ export function useRegister() {
             message = (data as any).title
           }
         } catch {
-          // ignore JSON parse errors
         }
 
         throw new Error(message)
