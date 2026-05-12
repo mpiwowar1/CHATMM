@@ -2,6 +2,7 @@ import { useState } from "react"
 import LoginForm from "./components/LoginForm"
 import RegisterForm from "./components/RegisterForm"
 import MainScreen from "./components/MainScreen"
+import ChatLayout from "./components/chat-layout"
 
 export function App() {
   const [view, setView] = useState<"login" | "register" | "main">("login")
