@@ -18,6 +18,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -92,13 +93,17 @@ public class ConversationService {
         User requester = userRepository.findByEmail(requesterEmail)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found."));
 
+        if (!conversationRepository.existsById(conversationId)) {
+            throw new ResourceNotFoundException("Conversation not found with id: " + conversationId);
+        }
+
         List<Participant> participants = participantRepository.findAllByConversationId(conversationId);
 
         boolean isMember = participants.stream()
                 .anyMatch(p -> p.getUser().getId().equals(requester.getId()));
 
         if (!isMember) {
-            throw new SecurityException("You are not a member of this conversation.");
+            throw new AccessDeniedException("You are not a member of this conversation.");
         }
 
         return participants.stream()
