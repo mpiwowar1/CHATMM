@@ -15,8 +15,7 @@ import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Component;
 import org.springframework.util.MimeTypeUtils;
 import org.springframework.web.socket.messaging.StompSubProtocolErrorHandler;
-
-import javax.security.sasl.AuthenticationException;
+import org.springframework.security.core.AuthenticationException;
 import java.nio.charset.StandardCharsets;
 
 @Component
