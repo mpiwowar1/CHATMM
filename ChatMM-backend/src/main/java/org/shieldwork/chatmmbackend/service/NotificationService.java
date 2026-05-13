@@ -6,6 +6,7 @@ import org.shieldwork.chatmmbackend.model.Participant;
 import org.shieldwork.chatmmbackend.repository.ParticipantRepository;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -17,6 +18,7 @@ public class NotificationService {
     private final SimpMessagingTemplate messagingTemplate;
     private final ParticipantRepository participantRepository;
 
+    @Transactional(readOnly = true)
     public void sendNewMessageNotification(Long conversationId, Long senderId, String senderName, String senderEmail) {
         List<Participant> participants = participantRepository.findAllByConversationId(conversationId);
 

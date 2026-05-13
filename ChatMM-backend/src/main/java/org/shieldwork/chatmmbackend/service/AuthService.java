@@ -93,6 +93,7 @@ public class AuthService {
                 .build();
     }
 
+    @Transactional
     public TokenRefreshResponse refreshToken(RefreshTokenRequest request) {
         String requestRefreshToken = request.getRefreshToken();
 

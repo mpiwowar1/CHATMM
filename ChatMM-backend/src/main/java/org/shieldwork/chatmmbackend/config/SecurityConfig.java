@@ -1,5 +1,6 @@
 package org.shieldwork.chatmmbackend.config;
 
+import org.shieldwork.chatmmbackend.security.DelegatingAuthenticationEntryPoint;
 import org.shieldwork.chatmmbackend.security.JwtAuthFilter;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
@@ -25,6 +26,7 @@ public class SecurityConfig {
 
     private final JwtAuthFilter jwtAuthFilter;
     private final AuthenticationProvider authenticationProvider;
+    private final DelegatingAuthenticationEntryPoint authenticationEntryPoint;
 
     @Value("${application.security.cors.allowed-origins}")
     private List<String> allowedOrigins;
@@ -34,6 +36,9 @@ public class SecurityConfig {
         http
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .csrf(AbstractHttpConfigurer::disable) // No need because of JWT
+                .exceptionHandling(exception -> exception
+                        .authenticationEntryPoint(authenticationEntryPoint)
+                )
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/auth/**").permitAll()
                         .requestMatchers("/ws/**").permitAll()
@@ -54,7 +59,7 @@ public class SecurityConfig {
 
         configuration.setAllowedOrigins(allowedOrigins);
 
-        configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE"));
+        configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
 
         configuration.setAllowedHeaders(List.of("Authorization", "Content-Type"));
 

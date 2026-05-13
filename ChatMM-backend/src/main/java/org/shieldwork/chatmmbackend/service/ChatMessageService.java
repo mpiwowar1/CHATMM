@@ -3,11 +3,9 @@ package org.shieldwork.chatmmbackend.service;
 import org.shieldwork.chatmmbackend.dto.response.MessagePageResponse;
 import org.shieldwork.chatmmbackend.dto.request.ChatMessagePayload;
 import org.shieldwork.chatmmbackend.dto.response.ChatMessageResponse;
-import org.shieldwork.chatmmbackend.exception.ChatMessageProcessingException;
 import org.shieldwork.chatmmbackend.exception.ResourceNotFoundException;
 import org.shieldwork.chatmmbackend.model.Conversation;
 import org.shieldwork.chatmmbackend.model.Message;
-import org.shieldwork.chatmmbackend.model.Participant;
 import org.shieldwork.chatmmbackend.model.User;
 import org.shieldwork.chatmmbackend.repository.ConversationRepository;
 import org.shieldwork.chatmmbackend.repository.MessageRepository;
@@ -16,9 +14,9 @@ import org.shieldwork.chatmmbackend.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.client.ResourceAccessException;
 
 import java.util.Comparator;
 import java.util.List;
@@ -44,7 +42,7 @@ public class ChatMessageService {
         boolean isMember = participantRepository.existsByConversationIdAndUserEmail(conversation.getId(), senderEmail);
 
         if (!isMember) {
-            throw new ChatMessageProcessingException("You do not have permission to post in this conversation");
+            throw new AccessDeniedException("You are not a member of this conversation.");
         }
 
         Message message = Message.builder()
@@ -55,6 +53,12 @@ public class ChatMessageService {
                 .build();
 
         Message savedMessage = messageRepository.save(message);
+
+        conversation.setLastMessageAt(savedMessage.getTimestamp());
+        conversation.setLastMessagePreview(payload.getCiphertext());
+        conversation.setLastMessageIv(payload.getIv());
+        conversation.setLastMessageSenderName(sender.getName());
+        conversationRepository.save(conversation);
 
         return ChatMessageResponse.builder()
                 .id(savedMessage.getId())
@@ -69,11 +73,14 @@ public class ChatMessageService {
 
     @Transactional(readOnly = true)
     public MessagePageResponse getConversationMessages(Long conversationId, String userEmail, Long cursor, int limit) {
+        if (!conversationRepository.existsById(conversationId)) {
+            throw new ResourceNotFoundException("Conversation not found with id: " + conversationId);
+        }
 
         boolean isMember = participantRepository.existsByConversationIdAndUserEmail(conversationId, userEmail);
 
         if (!isMember) {
-            throw new ChatMessageProcessingException("You do not have permission to post in this conversation.");
+            throw new AccessDeniedException("You are not a member of this conversation.");
         }
 
         List<Message> messages;

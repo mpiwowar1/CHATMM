@@ -1,5 +1,6 @@
 package org.shieldwork.chatmmbackend.config;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.shieldwork.chatmmbackend.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
@@ -40,5 +41,11 @@ public class ApplicationConfig {
     @Bean
     public PasswordEncoder passwordEncoder() {
         return new BCryptPasswordEncoder();
+    }
+
+    // Required by StompErrorHandler. Manually declared to resolve autowiring issues.
+    @Bean
+    public ObjectMapper objectMapper() {
+        return new ObjectMapper();
     }
 }

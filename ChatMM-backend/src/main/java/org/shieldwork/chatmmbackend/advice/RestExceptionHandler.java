@@ -20,6 +20,7 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 
 import java.util.stream.Collectors;
 
@@ -94,6 +95,19 @@ public class RestExceptionHandler {
     @ExceptionHandler(DataIntegrityViolationException.class)
     public ResponseEntity<ErrorResponse> handleDataIntegrityViolation(DataIntegrityViolationException ex, HttpServletRequest request) {
         return buildResponse("about:blank", HttpStatus.CONFLICT, "Data Conflict", "The action could not be completed due to a conflict with existing data (e.g., duplicate record).", request.getRequestURI());
+    }
+
+    @ExceptionHandler(org.springframework.security.core.AuthenticationException.class)
+    public ResponseEntity<ErrorResponse> handleAuthenticationException(Exception ex, HttpServletRequest request) {
+        return buildResponse("about:blank", HttpStatus.UNAUTHORIZED, "Unauthorized", "Full authentication is required to access this resource.", request.getRequestURI());
+    }
+
+    @ExceptionHandler(MethodArgumentTypeMismatchException.class)
+    public ResponseEntity<ErrorResponse> handleTypeMismatchException(MethodArgumentTypeMismatchException ex, HttpServletRequest request) {
+        String requiredTypeName = ex.getRequiredType() != null ? ex.getRequiredType().getSimpleName() : "unknown";
+        String detail = String.format("Invalid value provided for parameter '%s'. Expected type '%s'.", ex.getName(), requiredTypeName);
+
+        return buildResponse("about:blank", HttpStatus.BAD_REQUEST, "Invalid Parameter Type", detail, request.getRequestURI());
     }
 
     private ResponseEntity<ErrorResponse> buildResponse(String type, HttpStatus status, String title, String detail, String instance) {
