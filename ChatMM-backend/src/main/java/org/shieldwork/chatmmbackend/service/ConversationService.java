@@ -4,6 +4,7 @@ import org.shieldwork.chatmmbackend.dto.request.CreateConversationRequest;
 import org.shieldwork.chatmmbackend.dto.response.ConversationParticipantResponse;
 import org.shieldwork.chatmmbackend.dto.response.ConversationSummaryResponse;
 import org.shieldwork.chatmmbackend.dto.response.PublicKeyResponse;
+import org.shieldwork.chatmmbackend.exception.ConversationAlreadyExistsException;
 import org.shieldwork.chatmmbackend.exception.ResourceNotFoundException;
 import org.shieldwork.chatmmbackend.model.Conversation;
 import org.shieldwork.chatmmbackend.model.Participant;
@@ -48,7 +49,19 @@ public class ConversationService {
             throw new IllegalArgumentException("Conversation creator must be a participant");
         }
 
+        if (requestedUserIds.size() < 2) {
+            throw new IllegalArgumentException("Conversation must have at least two participants.");
+        }
+
         ConversationType type = requestedUserIds.size() > 2 ? ConversationType.GROUP : ConversationType.DIRECT;
+
+        if (type == ConversationType.DIRECT) {
+            List<Long> ids = requestedUserIds.stream().toList();
+
+            if (conversationRepository.existsDirectConversationBetween(ids.get(0), ids.get(1))) {
+                throw new ConversationAlreadyExistsException("A direct conversation between these users already exists.");
+            }
+        }
 
         Conversation conversation = Conversation.builder()
                 .name(request.getName())

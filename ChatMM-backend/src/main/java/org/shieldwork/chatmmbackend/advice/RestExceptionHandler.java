@@ -5,6 +5,7 @@ import io.jsonwebtoken.MalformedJwtException;
 import io.jsonwebtoken.security.SignatureException;
 import jakarta.servlet.http.HttpServletRequest;
 import org.shieldwork.chatmmbackend.dto.response.ErrorResponse;
+import org.shieldwork.chatmmbackend.exception.ConversationAlreadyExistsException;
 import org.shieldwork.chatmmbackend.exception.ResourceNotFoundException;
 import org.shieldwork.chatmmbackend.exception.TokenRefreshException;
 import org.shieldwork.chatmmbackend.exception.UserAlreadyExistsException;
@@ -108,6 +109,11 @@ public class RestExceptionHandler {
         String detail = String.format("Invalid value provided for parameter '%s'. Expected type '%s'.", ex.getName(), requiredTypeName);
 
         return buildResponse("about:blank", HttpStatus.BAD_REQUEST, "Invalid Parameter Type", detail, request.getRequestURI());
+    }
+
+    @ExceptionHandler(ConversationAlreadyExistsException.class)
+    public ResponseEntity<ErrorResponse> handleConversationAlreadyExistsException(ConversationAlreadyExistsException ex, HttpServletRequest request) {
+        return buildResponse("about:blank", HttpStatus.CONFLICT, "Conversation Already Exists", ex.getMessage(), request.getRequestURI());
     }
 
     private ResponseEntity<ErrorResponse> buildResponse(String type, HttpStatus status, String title, String detail, String instance) {
