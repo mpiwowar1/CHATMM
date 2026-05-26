@@ -78,6 +78,20 @@ export function useLogin() {
           name: data.name,
         })
       )
+      // Persist encrypted private key and full auth payload for later use
+      if (data.encryptedPrivateKey) {
+        localStorage.setItem("encryptedPrivateKey", data.encryptedPrivateKey)
+      }
+
+      // Save full auth response for convenience
+      try {
+        localStorage.setItem("authData", JSON.stringify(data))
+      } catch {}
+
+      // Store the device id used for this login so the client can reuse it
+      try {
+        localStorage.setItem("deviceId", deviceId)
+      } catch {}
 
       setAuthData(data)
       setStatus("success")
