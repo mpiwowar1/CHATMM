@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import Sidebar from "./Sidebar"
 import { ChatArea } from "./ChatArea"
 import type {
@@ -6,81 +6,51 @@ import type {
   ConversationSummaryResponse,
   UserResponse,
 } from "./chat-types"
+import useConversations from "@/hooks/useConversations"
 
 export function ChatLayout() {
+  // Try to read current user from localStorage (set on login)
+  const stored = typeof window !== "undefined" ? localStorage.getItem("user") : null
+  const parsed: Partial<UserResponse> | null = stored ? JSON.parse(stored) : null
+
   const currentUser: UserResponse = {
-    id: 1,
-    email: "maks@example.com",
-    name: "maks",
-    publicKey: "-----BEGIN PUBLIC KEY-----",
+    id: parsed?.id ?? 1,
+    email: parsed?.email ?? "guest@example.com",
+    name: parsed?.name ?? "guest",
+    publicKey: parsed?.publicKey ?? "",
   }
 
-  const conversations: ConversationSummaryResponse[] = [
-    { id: 101, name: "Kuba", type: "DIRECT", encryptedAesKey: "enc-key-1" },
-    { id: 102, name: "Dev Team", type: "GROUP", encryptedAesKey: "enc-key-2" },
-    {
-      id: 103,
-      name: "Jakub",
-      type: "DIRECT",
-      encryptedAesKey: "enc-key-3",
-    },
-  ]
+  const { conversations, loading, error, fetchConversations, createConversation } =
+    useConversations()
 
-  const seedMessages: ChatMessageResponse[] = [
-    {
-      id: 1,
-      conversationId: 101,
-      senderId: 2,
-      senderName: "Kuba",
-      ciphertext: "enc1",
-      iv: "iv1",
-      timestamp: new Date(Date.now() - 10 * 60000).toISOString(),
-    },
-    {
-      id: 2,
-      conversationId: 101,
-      senderId: 1,
-      senderName: "HSBADF",
-      ciphertext: "enc2",
-      iv: "iv2",
-      timestamp: new Date(Date.now() - 8 * 60000).toISOString(),
-    },
-    {
-      id: 3,
-      conversationId: 101,
-      senderId: 2,
-      senderName: "Jakub",
-      ciphertext: "enc3",
-      iv: "iv3",
-      timestamp: new Date(Date.now() - 3 * 60000).toISOString(),
-    },
-  ]
-
-  const seedDecrypted: Record<number, string> = {
-    1: "1?",
-    2: "2",
-    3: "3",
-  }
-
-  const [activeId, setActiveId] = useState<number>(101)
+  const [activeId, setActiveId] = useState<number | null>(conversations[0]?.id ?? null)
   const [messagesByConv, setMessagesByConv] = useState<
     Record<number, ChatMessageResponse[]>
-  >({
-    101: seedMessages,
-    102: [],
-    103: [],
-  })
+  >({})
   const [decryptedByConv, setDecryptedByConv] = useState<
     Record<number, Record<number, string>>
-  >({
-    101: seedDecrypted,
-  })
+  >({})
+
+  useEffect(() => {
+    if (conversations.length > 0 && activeId === null) {
+      setActiveId(conversations[0].id)
+    }
+    // keep activeId if conversations change
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [conversations])
+
+  useEffect(() => {
+    // refresh conversations on mount
+    fetchConversations()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const activeConversation = conversations.find((c) => c.id === activeId)!
-  const activeMessages = messagesByConv[activeId] ?? []
-  const activeDecrypted = decryptedByConv[activeId] ?? {}
+  const activeMessages = (activeId && messagesByConv[activeId]) ?? []
+  const activeDecrypted = (activeId && decryptedByConv[activeId]) ?? {}
 
   const handleSend = (plaintext: string) => {
+    if (!activeId) return
     const tempId = Date.now()
     const outgoing: ChatMessageResponse = {
       id: tempId,
@@ -102,21 +72,46 @@ export function ChatLayout() {
     }))
   }
 
+  const handleNewConversation = async () => {
+    const name = window.prompt("Conversation name (optional)")
+    const participantInput = window.prompt("Participant IDs (comma separated)")
+    if (!participantInput) return
+    const ids = participantInput
+      .split(",")
+      .map((s) => parseInt(s.trim(), 10))
+      .filter((n) => !Number.isNaN(n))
+
+    if (ids.length === 0) {
+      alert("Please provide at least one participant id")
+      return
+    }
+
+    const newId = await createConversation(name ?? null, ids)
+    if (newId) {
+      setActiveId(newId)
+    }
+  }
+
   return (
     <div className="flex h-screen overflow-hidden bg-background text-foreground">
       <Sidebar
         currentUser={currentUser}
         conversations={conversations}
-        activeId={activeId}
-        onSelect={setActiveId}
+        activeId={activeId ?? null}
+        onSelect={(id) => setActiveId(id)}
+        onCreateConversation={createConversation}
       />
-      <ChatArea
-        currentUserId={currentUser.id}
-        conversation={activeConversation}
-        messages={activeMessages}
-        decryptedMap={activeDecrypted}
-        onSend={handleSend}
-      />
+      {activeConversation ? (
+        <ChatArea
+          currentUserId={currentUser.id}
+          conversation={activeConversation}
+          messages={activeMessages}
+          decryptedMap={activeDecrypted}
+          onSend={handleSend}
+        />
+      ) : (
+        <div className="flex-1 flex items-center justify-center">{loading ? "Loading..." : error ?? "No conversation selected"}</div>
+      )}
     </div>
   )
 }

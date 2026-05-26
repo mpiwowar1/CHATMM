@@ -11,39 +11,36 @@ import { Plus } from "lucide-react"
 import type { ConversationSummaryResponse, UserResponse } from "./chat-types"
 import ConversationItem from "./ConversationItem"
 import SidebarUserBlock from "./SidebarUserBlock"
+import NewConversationSheet from "./NewConversationSheet"
 
 function Sidebar({
   currentUser,
   conversations,
   activeId,
   onSelect,
-  onNewConversation,
+  onCreateConversation,
 }: {
   currentUser: UserResponse
   conversations: ConversationSummaryResponse[]
   activeId: number | null
   onSelect: (id: number) => void
-  onNewConversation?: () => void
+  onCreateConversation?: (
+    name: string | null,
+    participantIds: number[]
+  ) => Promise<number | null>
 }) {
   return (
     <aside className="flex h-screen w-72 shrink-0 flex-col border-r bg-background">
       <div className="flex items-center justify-between px-4 pt-5 pb-3">
         <h1 className="text-lg font-semibold tracking-tight">Conversations</h1>
-        <TooltipProvider delayDuration={300}>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-8 w-8"
-                onClick={onNewConversation}
-              >
-                <Plus className="h-4 w-4" />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>New conversation</TooltipContent>
-          </Tooltip>
-        </TooltipProvider>
+        <div>
+          <NewConversationSheet
+            onCreate={async (name, ids) => {
+              if (!onCreateConversation) return null
+              return await onCreateConversation(name, ids)
+            }}
+          />
+        </div>
       </div>
 
       <Separator />
