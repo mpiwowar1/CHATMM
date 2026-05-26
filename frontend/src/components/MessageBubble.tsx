@@ -1,16 +1,14 @@
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
-import type { ChatMessageResponse } from "./chat-types"
+import type { DecryptedMessage } from "@/hooks/useChat"
 
 export function MessageBubble({
   message,
   isOwn,
   showSenderName,
-  decryptedText,
 }: {
-  message: ChatMessageResponse
+  message: DecryptedMessage
   isOwn: boolean
   showSenderName: boolean
-  decryptedText: string
 }) {
   const timeStr = new Date(message.timestamp).toLocaleTimeString([], {
     hour: "2-digit",
@@ -24,7 +22,11 @@ export function MessageBubble({
           {timeStr}
         </span>
         <div className="max-w-[65%] rounded-2xl rounded-br-sm bg-primary px-4 py-2 text-sm leading-relaxed text-primary-foreground shadow-sm">
-          {decryptedText}
+          {message.failed ? (
+            <span className="italic opacity-70">[decryption failed]</span>
+          ) : (
+            message.text
+          )}
         </div>
       </div>
     )
@@ -45,7 +47,11 @@ export function MessageBubble({
           </p>
         )}
         <div className="rounded-2xl rounded-bl-sm bg-muted px-4 py-2 text-sm leading-relaxed shadow-sm">
-          {decryptedText}
+          {message.failed ? (
+            <span className="italic opacity-70">[decryption failed]</span>
+          ) : (
+            message.text
+          )}
         </div>
       </div>
 

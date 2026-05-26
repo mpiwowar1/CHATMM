@@ -1,5 +1,8 @@
 import { useState } from "react"
 import { baseip } from "../encryption/ip"
+import { deriveKeyFromPassword } from "../encryption/crypto"
+import { decryptPrivateKey } from "../encryption/messageCrypto"
+import { storePrivateKey } from "../encryption/keyStore"
 
 type Status = "idle" | "loading" | "success" | "error"
 
@@ -17,6 +20,13 @@ interface AuthResponse {
   encryptedPrivateKey: string
 }
 
+async function fetchSalt(email: string): Promise<string> {
+  const res = await fetch(`${baseip}/auth/salt?email=${encodeURIComponent(email)}`)
+  if (!res.ok) throw new Error("Could not retrieve account salt.")
+  const data = await res.json()
+  return data.frontSalt as string
+}
+
 export function useLogin() {
   const [status, setStatus] = useState<Status>("idle")
   const [error, setError] = useState<string | null>(null)
@@ -29,77 +39,48 @@ export function useLogin() {
     try {
       const deviceId = `device_${Date.now()}_${Math.random().toString(36).substring(2, 15)}`
 
-      const loginRes = await fetch(baseip + "/auth/login", {
+      // 1. Fetch the per-user salt so we can derive the wrapping key client-side
+      const frontSaltB64 = await fetchSalt(email)
+      const saltBytes = Uint8Array.from(atob(frontSaltB64), (c) => c.charCodeAt(0))
+
+      // 2. Authenticate with the backend
+      const loginRes = await fetch(`${baseip}/auth/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          email,
-          password,
-          deviceId,
-        }),
+        body: JSON.stringify({ email, password, deviceId }),
       })
 
       if (!loginRes.ok) {
         let message = "Login failed"
-
         try {
           const data: unknown = await loginRes.json()
-          if (
-            typeof data === "object" &&
-            data !== null &&
-            "detail" in data &&
-            typeof (data as any).detail === "string"
-          ) {
-            message = (data as any).detail
-          } else if (
-            typeof data === "object" &&
-            data !== null &&
-            "title" in data &&
-            typeof (data as any).title === "string"
-          ) {
-            message = (data as any).title
+          if (typeof data === "object" && data !== null) {
+            const d = data as Record<string, unknown>
+            if (typeof d.detail === "string") message = d.detail
+            else if (typeof d.title === "string") message = d.title
           }
-        } catch {
-        }
-
+        } catch {}
         throw new Error(message)
       }
 
       const data: AuthResponse = await loginRes.json()
 
-  
+      // 3. Derive the wrapping key and decrypt the private key into memory
+      const wrappingKey = await deriveKeyFromPassword(password, saltBytes)
+      const privateKey = await decryptPrivateKey(data.encryptedPrivateKey, wrappingKey)
+      storePrivateKey(privateKey)
+
+      // 4. Persist tokens and non-sensitive user info
       localStorage.setItem("accessToken", data.accessToken)
       localStorage.setItem("refreshToken", data.refreshToken)
-      localStorage.setItem(
-        "user",
-        JSON.stringify({
-          id: data.id,
-          email: data.email,
-          name: data.name,
-        })
-      )
-      // Persist encrypted private key and full auth payload for later use
-      if (data.encryptedPrivateKey) {
-        localStorage.setItem("encryptedPrivateKey", data.encryptedPrivateKey)
-      }
-
-      // Save full auth response for convenience
-      try {
-        localStorage.setItem("authData", JSON.stringify(data))
-      } catch {}
-
-      // Store the device id used for this login so the client can reuse it
-      try {
-        localStorage.setItem("deviceId", deviceId)
-      } catch {}
+      localStorage.setItem("user", JSON.stringify({ id: data.id, email: data.email, name: data.name }))
+      localStorage.setItem("encryptedPrivateKey", data.encryptedPrivateKey)
+      localStorage.setItem("deviceId", deviceId)
 
       setAuthData(data)
       setStatus("success")
     } catch (err: unknown) {
-      const message =
-        err instanceof Error ? err.message : "Unexpected error occurred"
-
-      setError(message)
+      setError(err instanceof Error ? err.message : "Unexpected error occurred")
       setStatus("error")
     }
   }
