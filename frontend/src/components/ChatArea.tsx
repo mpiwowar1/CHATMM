@@ -36,21 +36,24 @@ export function ChatArea({
 
   // Scroll to bottom only when new messages arrive at the bottom
   // (not when older messages are prepended via loadMore)
+  const lastMessageIdRef = useRef<number | undefined>(undefined)
+
   useEffect(() => {
-    const prev = prevMessageCountRef.current
-    const curr = messages.length
+    const lastMsg = messages[messages.length - 1]
+    if (!lastMsg) return
 
-    if (curr > prev) {
-      const lastMsg = messages[curr - 1]
-      const firstMsg = messages[0]
-      const isNewAtBottom = lastMsg?.id !== firstMsg?.id
+    // Only scroll to bottom if a genuinely new message arrived at the end
+    if (lastMsg.id !== lastMessageIdRef.current) {
+      const wasAtBottom =
+        lastMessageIdRef.current !== undefined &&
+        messages.findIndex((m) => m.id === lastMessageIdRef.current) !== 0
 
-      if (isNewAtBottom) {
+      if (wasAtBottom || lastMessageIdRef.current === undefined) {
         bottomRef.current?.scrollIntoView({ behavior: "smooth" })
       }
     }
 
-    prevMessageCountRef.current = curr
+    lastMessageIdRef.current = lastMsg.id
   }, [messages])
 
   // Scroll to bottom on initial load

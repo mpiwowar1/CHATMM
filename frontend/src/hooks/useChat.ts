@@ -1,17 +1,25 @@
 import { useEffect, useRef, useState, useCallback } from "react"
 import { Client, type IMessage } from "@stomp/stompjs"
 import { baseip } from "@/encryption/ip"
-import { decryptConversationKey, encryptMessage, decryptMessage } from "@/encryption/messageCrypto"
-import { getPrivateKey, cacheConversationKey, getCachedConversationKey } from "@/encryption/keyStore"
+import {
+  decryptConversationKey,
+  encryptMessage,
+  decryptMessage,
+} from "@/encryption/messageCrypto"
+import {
+  getPrivateKey,
+  cacheConversationKey,
+  getCachedConversationKey,
+} from "@/encryption/keyStore"
 
 export type DecryptedMessage = {
   id: number
   conversationId: number
   senderId: number
   senderName: string
-  text: string           // decrypted plaintext
+  text: string // decrypted plaintext
   timestamp: string
-  failed?: boolean       // true if decryption failed
+  failed?: boolean // true if decryption failed
 }
 
 type RawMessage = {
@@ -63,7 +71,10 @@ async function getOrDecryptConversationKey(
   }
 }
 
-async function decryptRaw(msg: RawMessage, aesKey: CryptoKey): Promise<DecryptedMessage> {
+async function decryptRaw(
+  msg: RawMessage,
+  aesKey: CryptoKey
+): Promise<DecryptedMessage> {
   try {
     const text = await decryptMessage(msg.ciphertext, msg.iv, aesKey)
     return { ...msg, text }
@@ -76,7 +87,11 @@ async function fetchHistory(
   conversationId: number,
   cursor: number | null,
   limit: number
-): Promise<{ messages: RawMessage[]; nextCursor: number | null; hasMore: boolean }> {
+): Promise<{
+  messages: RawMessage[]
+  nextCursor: number | null
+  hasMore: boolean
+}> {
   const params = new URLSearchParams({ limit: String(limit) })
   if (cursor != null) params.set("cursor", String(cursor))
 
@@ -123,11 +138,18 @@ export function useChat(
     cursorRef.current = null
 
     try {
-      const aesKey = await getOrDecryptConversationKey(conversationId, encryptedAesKey)
+      const aesKey = await getOrDecryptConversationKey(
+        conversationId,
+        encryptedAesKey
+      )
       if (!aesKey) throw new Error("Could not decrypt conversation key.")
       aesKeyRef.current = aesKey
 
-      const { messages: raw, nextCursor, hasMore: more } = await fetchHistory(conversationId, null, LIMIT)
+      const {
+        messages: raw,
+        nextCursor,
+        hasMore: more,
+      } = await fetchHistory(conversationId, null, LIMIT)
 
       const decrypted = await Promise.all(raw.map((m) => decryptRaw(m, aesKey)))
       setMessages(decrypted)
@@ -146,18 +168,22 @@ export function useChat(
     setLoadingMore(true)
 
     try {
-      const { messages: raw, nextCursor, hasMore: more } = await fetchHistory(
-        conversationId,
-        cursorRef.current,
-        LIMIT
-      )
+      const {
+        messages: raw,
+        nextCursor,
+        hasMore: more,
+      } = await fetchHistory(conversationId, cursorRef.current, LIMIT)
 
-      const decrypted = await Promise.all(raw.map((m) => decryptRaw(m, aesKeyRef.current!)))
+      const decrypted = await Promise.all(
+        raw.map((m) => decryptRaw(m, aesKeyRef.current!))
+      )
       setMessages((prev) => [...decrypted, ...prev]) // older messages go to the top
       setHasMore(more)
       cursorRef.current = nextCursor
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load more messages")
+      setError(
+        err instanceof Error ? err.message : "Failed to load more messages"
+      )
     } finally {
       setLoadingMore(false)
     }
@@ -177,19 +203,29 @@ export function useChat(
       onConnect: () => {
         setConnected(true)
 
-        client.subscribe(`/topic/conversation.${conversationId}`, async (frame: IMessage) => {
-          const raw: RawMessage = JSON.parse(frame.body)
+        client.subscribe(
+          `/topic/conversation.${conversationId}`,
+          async (frame: IMessage) => {
+            const raw: RawMessage = JSON.parse(frame.body)
 
-          const aesKey = aesKeyRef.current
-          if (!aesKey) return
+            // Wait for key if not ready yet instead of silently dropping
+            let aesKey = aesKeyRef.current
+            if (!aesKey && encryptedAesKey) {
+              aesKey = await getOrDecryptConversationKey(
+                conversationId,
+                encryptedAesKey
+              )
+              aesKeyRef.current = aesKey
+            }
+            if (!aesKey) return
 
-          const msg = await decryptRaw(raw, aesKey)
-          setMessages((prev) => {
-            // Deduplicate by id in case of re-delivery
-            if (prev.some((m) => m.id === msg.id)) return prev
-            return [...prev, msg]
-          })
-        })
+            const msg = await decryptRaw(raw, aesKey)
+            setMessages((prev) => {
+              if (prev.some((m) => m.id === msg.id)) return prev
+              return [...prev, msg]
+            })
+          }
+        )
       },
       onDisconnect: () => setConnected(false),
       onStompError: (frame) => {
@@ -216,29 +252,32 @@ export function useChat(
     loadHistory()
   }, [loadHistory])
 
-  const sendMessage = useCallback(async (text: string): Promise<void> => {
-    if (!conversationId || !stompRef.current?.connected) {
-      setError("Not connected")
-      return
-    }
+  const sendMessage = useCallback(
+    async (text: string): Promise<void> => {
+      if (!conversationId || !stompRef.current?.connected) {
+        setError("Not connected")
+        return
+      }
 
-    const aesKey = aesKeyRef.current
-    if (!aesKey) {
-      setError("Conversation key not available")
-      return
-    }
+      const aesKey = aesKeyRef.current
+      if (!aesKey) {
+        setError("Conversation key not available")
+        return
+      }
 
-    try {
-      const { ciphertext, iv } = await encryptMessage(text, aesKey)
+      try {
+        const { ciphertext, iv } = await encryptMessage(text, aesKey)
 
-      stompRef.current.publish({
-        destination: "/app/chat.send",
-        body: JSON.stringify({ conversationId, ciphertext, iv }),
-      })
-    } catch {
-      setError("Failed to encrypt or send message")
-    }
-  }, [conversationId])
+        stompRef.current.publish({
+          destination: "/app/chat.send",
+          body: JSON.stringify({ conversationId, ciphertext, iv }),
+        })
+      } catch {
+        setError("Failed to encrypt or send message")
+      }
+    },
+    [conversationId]
+  )
 
   return {
     messages,
