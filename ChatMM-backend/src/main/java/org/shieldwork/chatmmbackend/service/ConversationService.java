@@ -4,6 +4,7 @@ import org.shieldwork.chatmmbackend.dto.request.CreateConversationRequest;
 import org.shieldwork.chatmmbackend.dto.response.ConversationParticipantResponse;
 import org.shieldwork.chatmmbackend.dto.response.ConversationSummaryResponse;
 import org.shieldwork.chatmmbackend.dto.response.PublicKeyResponse;
+import org.shieldwork.chatmmbackend.exception.ConversationAlreadyExistsException;
 import org.shieldwork.chatmmbackend.exception.ResourceNotFoundException;
 import org.shieldwork.chatmmbackend.model.Conversation;
 import org.shieldwork.chatmmbackend.model.Participant;
@@ -34,6 +35,7 @@ public class ConversationService {
     private final ConversationRepository conversationRepository;
     private final ParticipantRepository participantRepository;
     private final UserRepository userRepository;
+    private final NotificationService notificationService;
 
     @Transactional
     public Long createConversation(CreateConversationRequest request, String creatorEmail) {
@@ -48,7 +50,19 @@ public class ConversationService {
             throw new IllegalArgumentException("Conversation creator must be a participant");
         }
 
+        if (requestedUserIds.size() < 2) {
+            throw new IllegalArgumentException("Conversation must have at least two participants.");
+        }
+
         ConversationType type = requestedUserIds.size() > 2 ? ConversationType.GROUP : ConversationType.DIRECT;
+
+        if (type == ConversationType.DIRECT) {
+            List<Long> ids = requestedUserIds.stream().toList();
+
+            if (conversationRepository.existsDirectConversationBetween(ids.get(0), ids.get(1))) {
+                throw new ConversationAlreadyExistsException("A direct conversation between these users already exists.");
+            }
+        }
 
         Conversation conversation = Conversation.builder()
                 .name(request.getName())
@@ -82,6 +96,43 @@ public class ConversationService {
         }).toList();
 
         participantRepository.saveAll(participantsToSave);
+
+        List<ConversationParticipantResponse> participantDtos = participantsToSave.stream()
+                .map(p -> ConversationParticipantResponse.builder()
+                        .id(p.getUser().getId())
+                        .email(p.getUser().getEmail())
+                        .name(p.getUser().getName())
+                        .role(p.getRole())
+                        .build())
+                .toList();
+
+        for (Participant p : participantsToSave) {
+            String targetEmail = p.getUser().getEmail();
+
+            if (!targetEmail.equals(creatorEmail)) {
+                String displayName = savedConversation.getName();
+
+                if (savedConversation.getType() == ConversationType.DIRECT) {
+                    displayName = creator.getName();
+                } else if (displayName == null || displayName.isBlank()) {
+                    displayName = participantsToSave.stream()
+                            .limit(3)
+                            .map(part -> part.getUser().getName())
+                            .collect(Collectors.joining(", ")) + "...";
+                }
+
+                ConversationSummaryResponse summaryPayload = ConversationSummaryResponse.builder()
+                        .id(savedConversation.getId())
+                        .name(displayName)
+                        .type(savedConversation.getType())
+                        .encryptedAesKey(p.getEncryptedAesKey())
+                        .lastMessageAt(savedConversation.getLastMessageAt())
+                        .participants(participantDtos)
+                        .build();
+
+                notificationService.sendNewConversationNotification(targetEmail, summaryPayload);
+            }
+        }
 
         return savedConversation.getId();
     }

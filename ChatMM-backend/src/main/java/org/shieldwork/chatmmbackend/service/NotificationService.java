@@ -1,6 +1,7 @@
 package org.shieldwork.chatmmbackend.service;
 
 import lombok.RequiredArgsConstructor;
+import org.shieldwork.chatmmbackend.dto.response.ConversationSummaryResponse;
 import org.shieldwork.chatmmbackend.dto.response.NotificationResponse;
 import org.shieldwork.chatmmbackend.model.Participant;
 import org.shieldwork.chatmmbackend.repository.ParticipantRepository;
@@ -40,5 +41,14 @@ public class NotificationService {
                 );
             }
         }
+    }
+
+    @Transactional(readOnly = true)
+    public void sendNewConversationNotification(String targetEmail, ConversationSummaryResponse conversationSummary) {
+        messagingTemplate.convertAndSendToUser(
+                targetEmail,
+                "/queue/conversations",
+                conversationSummary
+        );
     }
 }

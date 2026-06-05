@@ -40,6 +40,8 @@ public class StompAuthInterceptor implements ChannelInterceptor {
             handleConnect(accessor);
         } else if (StompCommand.SUBSCRIBE.equals(accessor.getCommand())) {
             handleSubscribe(accessor);
+        }   else if (StompCommand.SEND.equals(accessor.getCommand())) {
+            handleSend(accessor);
         }
 
         return message;
@@ -88,6 +90,14 @@ public class StompAuthInterceptor implements ChannelInterceptor {
             } catch (NumberFormatException e) {
                 throw new IllegalArgumentException("Invalid conversation ID format.");
             }
+        }
+    }
+
+    private void handleSend(StompHeaderAccessor accessor) {
+        String destination = accessor.getDestination();
+
+        if (destination != null && !destination.startsWith("/app/")) {
+            throw new AccessDeniedException("Direct messaging to the broker is forbidden. Use /app/ endpoints.");
         }
     }
 }

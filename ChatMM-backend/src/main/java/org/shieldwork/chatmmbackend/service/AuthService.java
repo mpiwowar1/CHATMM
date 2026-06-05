@@ -67,8 +67,6 @@ public class AuthService {
         User user = userRepository.findByEmail(request.getEmail())
                 .orElseThrow(() -> new ResourceNotFoundException("User not found.")); // with this email
 
-        boolean isNewDevice = !refreshTokenRepository.existsByUserAndDeviceId(user, request.getDeviceId());
-
         String jwtToken = jwtService.generateToken(user);
 
         refreshTokenRepository.deleteByUserAndDeviceId(user, request.getDeviceId());
@@ -89,7 +87,7 @@ public class AuthService {
                 .id(user.getId())
                 .email(user.getEmail())
                 .name(user.getName())
-                .encryptedPrivateKey(isNewDevice ? user.getEncryptedPrivateKey() : null)
+                .encryptedPrivateKey(user.getEncryptedPrivateKey())
                 .build();
     }
 
