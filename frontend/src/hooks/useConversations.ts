@@ -27,6 +27,12 @@ export function useConversations(page = 0, size = 50) {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
+  function addConversation(conv: ConversationSummaryResponse) {
+    setConversations((prev) =>
+      prev.some((c) => c.id === conv.id) ? prev : [conv, ...prev]
+    )
+  }
+
   function updateConversationPreview(
     conversationId: number,
     senderName: string,
@@ -128,6 +134,7 @@ export function useConversations(page = 0, size = 50) {
     fetchConversations,
     createConversation,
     updateConversationPreview,
+    addConversation,
   }
 }
 

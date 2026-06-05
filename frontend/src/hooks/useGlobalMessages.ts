@@ -42,76 +42,109 @@ type PreviewUpdate = {
 export function useGlobalMessages(
   conversations: ConversationSummaryResponse[],
   activeConversationId: number | null,
-  onPreviewUpdate: (update: PreviewUpdate) => void
+  onPreviewUpdate: (update: PreviewUpdate) => void,
+  onNewConversation: (conversation: ConversationSummaryResponse) => void
 ) {
   const stompRef = useRef<Client | null>(null)
   const conversationsRef = useRef(conversations)
   const onPreviewUpdateRef = useRef(onPreviewUpdate)
+  const onNewConversationRef = useRef(onNewConversation)
+  const subscribedIdsRef = useRef<Set<number>>(new Set())
 
-  // Always keep refs current without reconnecting STOMP
   useEffect(() => {
     conversationsRef.current = conversations
   }, [conversations])
   useEffect(() => {
     onPreviewUpdateRef.current = onPreviewUpdate
   }, [onPreviewUpdate])
+  useEffect(() => {
+    onNewConversationRef.current = onNewConversation
+  }, [onNewConversation])
+
+  const subscribeToConversation = (
+    client: Client,
+    conv: ConversationSummaryResponse
+  ) => {
+    if (subscribedIdsRef.current.has(conv.id)) return
+    subscribedIdsRef.current.add(conv.id)
+
+    console.info("Subscribing to conversation topic", conv.id)
+
+    client.subscribe(
+      `/topic/conversation.${conv.id}`,
+      async (frame: IMessage) => {
+        const raw: RawMessage = JSON.parse(frame.body)
+        console.info("Received message event", {
+          conversationId: raw.conversationId,
+          senderName: raw.senderName,
+          conversationTopic: conv.id,
+        })
+
+        // Skip active conversation — useChat handles that one
+        if (raw.conversationId === activeConversationId) return
+
+        let aesKey = getCachedConversationKey(conv.id)
+        if (!aesKey) {
+          const privateKey = getPrivateKey()
+          if (!privateKey) return
+          try {
+            aesKey = await decryptConversationKey(
+              conv.encryptedAesKey,
+              privateKey
+            )
+            cacheConversationKey(conv.id, aesKey)
+          } catch {
+            return
+          }
+        }
+
+        try {
+          const text = await decryptMessage(raw.ciphertext, raw.iv, aesKey)
+          onPreviewUpdateRef.current({
+            conversationId: conv.id,
+            text,
+            senderName: raw.senderName,
+            timestamp: raw.timestamp,
+          })
+        } catch {}
+      }
+    )
+  }
 
   useEffect(() => {
     const token = getToken()
-    if (!token) return
+    if (!token) {
+      console.warn("Global STOMP not started: missing access token")
+      return
+    }
 
     const client = new Client({
       brokerURL: toWsUrl(baseip),
       connectHeaders: { Authorization: `Bearer ${token}` },
       reconnectDelay: 5000,
       onConnect: () => {
-        // Subscribe to every conversation the user is part of
-        conversationsRef.current.forEach((conv) => {
-          client.subscribe(
-            `/topic/conversation.${conv.id}`,
-            async (frame: IMessage) => {
-              const raw: RawMessage = JSON.parse(frame.body)
+        console.info("Global STOMP connected")
 
-              // Skip active conversation — useChat handles that one
-              if (raw.conversationId === activeConversationId) return
+        // Subscribe to all existing conversations
+        conversationsRef.current.forEach((conv) =>
+          subscribeToConversation(client, conv)
+        )
 
-              // Resolve AES key
-              let aesKey = getCachedConversationKey(conv.id)
-              if (!aesKey) {
-                const privateKey = getPrivateKey()
-                if (!privateKey) return
-                try {
-                  aesKey = await decryptConversationKey(
-                    conv.encryptedAesKey,
-                    privateKey
-                  )
-                  cacheConversationKey(conv.id, aesKey)
-                } catch {
-                  return
-                }
-              }
+        // Subscribe to new conversation notifications
+        client.subscribe(`/user/queue/conversations`, (frame: IMessage) => {
+          console.info("New conversation notification arrived", frame.body)
+          const newConv: ConversationSummaryResponse = JSON.parse(frame.body)
+          console.info("Received new conversation notification", newConv)
 
-              // Decrypt and emit preview update
-              try {
-                const text = await decryptMessage(
-                  raw.ciphertext,
-                  raw.iv,
-                  aesKey
-                )
-                onPreviewUpdateRef.current({
-                  conversationId: conv.id,
-                  text,
-                  senderName: raw.senderName,
-                  timestamp: raw.timestamp,
-                })
-              } catch {
-                // ignore decryption failures on preview
-              }
-            }
-          )
+          // Subscribe to its topic immediately so messages start arriving
+          subscribeToConversation(client, newConv)
+
+          // Notify ChatLayout to add it to the list
+          onNewConversationRef.current(newConv)
         })
       },
       onStompError: (frame) => console.error("Global STOMP error", frame),
+      onWebSocketClose: () => console.info("Global STOMP disconnected"),
     })
 
     client.activate()
@@ -120,48 +153,14 @@ export function useGlobalMessages(
     return () => {
       client.deactivate()
       stompRef.current = null
+      subscribedIdsRef.current.clear()
     }
-  }, []) // Only connect once — conversations added via ref
+  }, [])
 
-  // When conversations list changes (new conversation added), subscribe to new ones
+  // Subscribe to any newly added conversations
   useEffect(() => {
     const client = stompRef.current
     if (!client?.connected) return
-
-    conversations.forEach((conv) => {
-      // @stomp/stompjs deduplicates subscriptions by destination internally
-      client.subscribe(
-        `/topic/conversation.${conv.id}`,
-        async (frame: IMessage) => {
-          const raw: RawMessage = JSON.parse(frame.body)
-          if (raw.conversationId === activeConversationId) return
-
-          let aesKey = getCachedConversationKey(conv.id)
-          if (!aesKey) {
-            const privateKey = getPrivateKey()
-            if (!privateKey) return
-            try {
-              aesKey = await decryptConversationKey(
-                conv.encryptedAesKey,
-                privateKey
-              )
-              cacheConversationKey(conv.id, aesKey)
-            } catch {
-              return
-            }
-          }
-
-          try {
-            const text = await decryptMessage(raw.ciphertext, raw.iv, aesKey)
-            onPreviewUpdateRef.current({
-              conversationId: conv.id,
-              text,
-              senderName: raw.senderName,
-              timestamp: raw.timestamp,
-            })
-          } catch {}
-        }
-      )
-    })
+    conversations.forEach((conv) => subscribeToConversation(client, conv))
   }, [conversations])
 }

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import Sidebar from "./Sidebar"
 import { ChatArea } from "./ChatArea"
 import type { ConversationSummaryResponse, UserResponse } from "./chat-types"
@@ -31,12 +31,34 @@ export function ChatLayout() {
     fetchConversations,
     createConversation,
     updateConversationPreview,
+    addConversation,
   } = useConversations()
 
   const [activeId, setActiveId] = useState<number | null>(null)
   const [previewOverrides, setPreviewOverrides] = useState<
     Record<number, string>
   >({})
+  const refreshTimeoutRef = useRef<number | null>(null)
+
+  const handleNewConversation = (conversation: ConversationSummaryResponse) => {
+    addConversation(conversation)
+
+    if (refreshTimeoutRef.current) {
+      window.clearTimeout(refreshTimeoutRef.current)
+    }
+
+    refreshTimeoutRef.current = window.setTimeout(() => {
+      fetchConversations()
+    }, 800)
+  }
+
+  useEffect(() => {
+    return () => {
+      if (refreshTimeoutRef.current) {
+        window.clearTimeout(refreshTimeoutRef.current)
+      }
+    }
+  }, [])
 
   useGlobalMessages(
     conversations,
@@ -44,7 +66,8 @@ export function ChatLayout() {
     ({ conversationId, text, senderName, timestamp }) => {
       setPreviewOverrides((prev) => ({ ...prev, [conversationId]: text }))
       updateConversationPreview(conversationId, senderName, timestamp)
-    }
+    },
+    handleNewConversation
   )
 
   useEffect(() => {
