@@ -74,11 +74,11 @@ export function ChatArea({
   )
 
   return (
-    <div className="flex h-screen min-w-0 flex-1 flex-col">
+    <div className="flex h-screen min-w-0 flex-1 flex-col overflow-hidden">
       <ChatHeader conversation={conversation} connected={connected} />
 
       <ScrollArea
-        className="flex-1 px-5 py-4"
+        className="min-h-0 flex-1 px-5 py-4"
         onScrollCapture={handleScroll}
         ref={scrollAreaRef}
       >

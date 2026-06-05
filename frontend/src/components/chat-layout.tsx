@@ -5,6 +5,7 @@ import type { ConversationSummaryResponse, UserResponse } from "./chat-types"
 import useConversations from "@/hooks/useConversations"
 import { useChat } from "@/hooks/useChat"
 import { useDecryptedPreviews } from "@/hooks/useDecryptedPreviews"
+import { useGlobalMessages } from "@/hooks/useGlobalMessages"
 
 function getCurrentUser(): UserResponse {
   const stored =
@@ -29,13 +30,23 @@ export function ChatLayout() {
     error,
     fetchConversations,
     createConversation,
+    updateConversationPreview,
   } = useConversations()
 
   const [activeId, setActiveId] = useState<number | null>(null)
+  const [previewOverrides, setPreviewOverrides] = useState<
+    Record<number, string>
+  >({})
 
-  const decryptedPreviews = useDecryptedPreviews(conversations)
+  useGlobalMessages(
+    conversations,
+    activeId,
+    ({ conversationId, text, senderName, timestamp }) => {
+      setPreviewOverrides((prev) => ({ ...prev, [conversationId]: text }))
+      updateConversationPreview(conversationId, senderName, timestamp)
+    }
+  )
 
-  // Set first conversation as active once loaded
   useEffect(() => {
     if (conversations.length > 0 && activeId === null) {
       setActiveId(conversations[0].id)
@@ -56,17 +67,35 @@ export function ChatLayout() {
     loadMore,
   } = useChat(activeId, activeConversation?.encryptedAesKey ?? null)
 
+  const lastMessage = messages[messages.length - 1]
+
+  useEffect(() => {
+    if (!lastMessage || !activeId) return
+    setPreviewOverrides((prev) => ({ ...prev, [activeId]: lastMessage.text }))
+    updateConversationPreview(
+      activeId,
+      lastMessage.senderName,
+      lastMessage.timestamp
+    )
+  }, [lastMessage?.id])
+
+  const decryptedPreviews = useDecryptedPreviews(conversations)
+
+  const mergedPreviews: Record<number, string> = {
+    ...decryptedPreviews,
+    ...previewOverrides,
+  }
+
   return (
     <div className="flex h-screen overflow-hidden bg-background text-foreground">
       <Sidebar
         currentUser={currentUser}
         conversations={conversations}
-        decryptedPreviews={decryptedPreviews} // ← add this
         activeId={activeId}
         onSelect={setActiveId}
         onCreateConversation={createConversation}
+        decryptedPreviews={mergedPreviews}
       />
-
       {activeConversation ? (
         <ChatArea
           currentUserId={currentUser.id}

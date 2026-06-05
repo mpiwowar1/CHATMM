@@ -117,10 +117,16 @@ export function useChat(
 
   const cursorRef = useRef<number | null>(null)
   const aesKeyRef = useRef<CryptoKey | null>(null)
+  const encryptedAesKeyRef = useRef<string | null>(null) // ← NEW
   const stompRef = useRef<Client | null>(null)
   const LIMIT = 50
 
-  // Resolve and cache the AES key whenever the conversation changes
+  // Keep encryptedAesKeyRef always current
+  useEffect(() => {
+    encryptedAesKeyRef.current = encryptedAesKey
+  }, [encryptedAesKey])
+
+  // Resolve and cache the AES key whenever the conversation or key changes
   useEffect(() => {
     if (!conversationId || !encryptedAesKey) return
     aesKeyRef.current = null
@@ -130,9 +136,8 @@ export function useChat(
     })
   }, [conversationId, encryptedAesKey])
 
-  // Load initial message history
   const loadHistory = useCallback(async () => {
-    if (!conversationId || !encryptedAesKey) return
+    if (!conversationId || !encryptedAesKeyRef.current) return
     setLoading(true)
     setError(null)
     cursorRef.current = null
@@ -140,7 +145,7 @@ export function useChat(
     try {
       const aesKey = await getOrDecryptConversationKey(
         conversationId,
-        encryptedAesKey
+        encryptedAesKeyRef.current
       )
       if (!aesKey) throw new Error("Could not decrypt conversation key.")
       aesKeyRef.current = aesKey
@@ -150,7 +155,6 @@ export function useChat(
         nextCursor,
         hasMore: more,
       } = await fetchHistory(conversationId, null, LIMIT)
-
       const decrypted = await Promise.all(raw.map((m) => decryptRaw(m, aesKey)))
       setMessages(decrypted)
       setHasMore(more)
@@ -160,9 +164,8 @@ export function useChat(
     } finally {
       setLoading(false)
     }
-  }, [conversationId, encryptedAesKey])
+  }, [conversationId]) // ← encryptedAesKey removed, using ref instead
 
-  // Load older messages (cursor pagination)
   const loadMore = useCallback(async () => {
     if (!conversationId || !aesKeyRef.current || !hasMore || loadingMore) return
     setLoadingMore(true)
@@ -173,11 +176,10 @@ export function useChat(
         nextCursor,
         hasMore: more,
       } = await fetchHistory(conversationId, cursorRef.current, LIMIT)
-
       const decrypted = await Promise.all(
         raw.map((m) => decryptRaw(m, aesKeyRef.current!))
       )
-      setMessages((prev) => [...decrypted, ...prev]) // older messages go to the top
+      setMessages((prev) => [...decrypted, ...prev])
       setHasMore(more)
       cursorRef.current = nextCursor
     } catch (err) {
@@ -189,10 +191,9 @@ export function useChat(
     }
   }, [conversationId, hasMore, loadingMore])
 
-  // STOMP WebSocket — connect and subscribe when conversation changes
+  // STOMP — only reconnects when conversationId changes
   useEffect(() => {
     if (!conversationId) return
-
     const token = getToken()
     if (!token) return
 
@@ -208,12 +209,12 @@ export function useChat(
           async (frame: IMessage) => {
             const raw: RawMessage = JSON.parse(frame.body)
 
-            // Wait for key if not ready yet instead of silently dropping
+            // Always resolve fresh — uses ref so we always have the latest key
             let aesKey = aesKeyRef.current
-            if (!aesKey && encryptedAesKey) {
+            if (!aesKey && encryptedAesKeyRef.current) {
               aesKey = await getOrDecryptConversationKey(
                 conversationId,
-                encryptedAesKey
+                encryptedAesKeyRef.current
               )
               aesKeyRef.current = aesKey
             }
@@ -242,9 +243,8 @@ export function useChat(
       stompRef.current = null
       setConnected(false)
     }
-  }, [conversationId])
+  }, [conversationId]) // ← no encryptedAesKey dep, uses ref
 
-  // Load history whenever the conversation changes
   useEffect(() => {
     setMessages([])
     setHasMore(false)
@@ -267,7 +267,6 @@ export function useChat(
 
       try {
         const { ciphertext, iv } = await encryptMessage(text, aesKey)
-
         stompRef.current.publish({
           destination: "/app/chat.send",
           body: JSON.stringify({ conversationId, ciphertext, iv }),
