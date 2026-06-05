@@ -16,6 +16,7 @@ import NewConversationSheet from "./NewConversationSheet"
 function Sidebar({
   currentUser,
   conversations,
+  decryptedPreviews,
   activeId,
   onSelect,
   onCreateConversation,
@@ -23,10 +24,11 @@ function Sidebar({
   currentUser: UserResponse
   conversations: ConversationSummaryResponse[]
   activeId: number | null
+  decryptedPreviews: Record<number, string>
   onSelect: (id: number) => void
   onCreateConversation?: (
     name: string | null,
-    participantIds: number[]
+    participants: ParticipantKey[]
   ) => Promise<number | null>
 }) {
   return (
@@ -35,9 +37,9 @@ function Sidebar({
         <h1 className="text-lg font-semibold tracking-tight">Conversations</h1>
         <div>
           <NewConversationSheet
-            onCreate={async (name, ids) => {
+            onCreate={async (name, participants) => {
               if (!onCreateConversation) return null
-              return await onCreateConversation(name, ids)
+              return await onCreateConversation(name, participants)
             }}
           />
         </div>
@@ -52,6 +54,7 @@ function Sidebar({
               key={c.id}
               conversation={c}
               isActive={c.id === activeId}
+              preview={decryptedPreviews[c.id] ?? null}
               onClick={() => onSelect(c.id)}
             />
           ))}

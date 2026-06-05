@@ -4,6 +4,7 @@ import { ChatArea } from "./ChatArea"
 import type { ConversationSummaryResponse, UserResponse } from "./chat-types"
 import useConversations from "@/hooks/useConversations"
 import { useChat } from "@/hooks/useChat"
+import { useDecryptedPreviews } from "@/hooks/useDecryptedPreviews"
 
 function getCurrentUser(): UserResponse {
   const stored =
@@ -32,6 +33,8 @@ export function ChatLayout() {
 
   const [activeId, setActiveId] = useState<number | null>(null)
 
+  const decryptedPreviews = useDecryptedPreviews(conversations)
+
   // Set first conversation as active once loaded
   useEffect(() => {
     if (conversations.length > 0 && activeId === null) {
@@ -58,6 +61,7 @@ export function ChatLayout() {
       <Sidebar
         currentUser={currentUser}
         conversations={conversations}
+        decryptedPreviews={decryptedPreviews} // ← add this
         activeId={activeId}
         onSelect={setActiveId}
         onCreateConversation={createConversation}

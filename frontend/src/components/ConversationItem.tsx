@@ -7,15 +7,30 @@ import type { ConversationSummaryResponse } from "./chat-types"
 function ConversationItem({
   conversation,
   isActive,
+  preview,
   onClick,
 }: {
   conversation: ConversationSummaryResponse
   isActive: boolean
+  preview: string | null
   onClick: () => void
 }) {
   const displayName =
     conversation.name ||
     (conversation.type === "GROUP" ? "Group Chat" : "Direct Message")
+
+  const previewText = preview
+    ? conversation.lastMessageSenderName
+      ? `${conversation.lastMessageSenderName}: ${preview}`
+      : preview
+    : null
+
+  const timeStr = conversation.lastMessageAt
+    ? new Date(conversation.lastMessageAt).toLocaleTimeString([], {
+        hour: "2-digit",
+        minute: "2-digit",
+      })
+    : null
 
   return (
     <button
@@ -31,22 +46,37 @@ function ConversationItem({
         </AvatarFallback>
       </Avatar>
 
-      <div className="flex min-w-0 flex-1 items-center justify-between gap-2">
-        <span className="truncate text-sm font-medium">{displayName}</span>
-        <Badge
-          variant={conversation.type === "GROUP" ? "secondary" : "outline"}
-          className="flex h-4 shrink-0 items-center gap-0.5 px-1.5 text-[10px]"
-        >
-          {conversation.type === "GROUP" ? (
-            <>
-              <Users className="h-2.5 w-2.5" /> Group
-            </>
-          ) : (
-            <>
-              <User className="h-2.5 w-2.5" /> DM
-            </>
-          )}
-        </Badge>
+      <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+        <div className="flex items-center justify-between gap-2">
+          <span className="truncate text-sm font-medium">{displayName}</span>
+          <div className="flex shrink-0 items-center gap-1">
+            {timeStr && (
+              <span className="text-[10px] text-muted-foreground">
+                {timeStr}
+              </span>
+            )}
+            <Badge
+              variant={conversation.type === "GROUP" ? "secondary" : "outline"}
+              className="flex h-4 items-center gap-0.5 px-1.5 text-[10px]"
+            >
+              {conversation.type === "GROUP" ? (
+                <>
+                  <Users className="h-2.5 w-2.5" /> Group
+                </>
+              ) : (
+                <>
+                  <User className="h-2.5 w-2.5" /> DM
+                </>
+              )}
+            </Badge>
+          </div>
+        </div>
+
+        {previewText && (
+          <p className="truncate text-xs text-muted-foreground">
+            {previewText}
+          </p>
+        )}
       </div>
     </button>
   )
