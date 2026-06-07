@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button"
 import { MoreHorizontal } from "lucide-react"
 import type { ConversationSummaryResponse } from "./chat-types"
 
+/** Small header showing conversation name and type. */
 function ChatHeader({
   conversation,
   onMore,

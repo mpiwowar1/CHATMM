@@ -24,6 +24,7 @@ type Fields = {
   password: string
 }
 
+/** Login form: derive keys and sign in the user. */
 export default function LoginForm({
   onSwitchToRegister,
   onLoggingIn,

@@ -18,6 +18,7 @@ import { LogOut, Settings, Sun, Moon } from "lucide-react"
 import { useTheme } from "@/components/theme-provider"
 import type { UserResponse } from "./chat-types"
 
+/** User block shown in the sidebar with theme and logout actions. */
 function SidebarUserBlock({
   user,
   onLogout,

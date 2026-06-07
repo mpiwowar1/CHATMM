@@ -14,6 +14,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Check, X } from "lucide-react"
 import useUserSearch from "@/hooks/useUserSearch"
 import { baseip } from "@/encryption/ip"
+import { getAuthHeader } from "@/encryption/utils"
 import type { ParticipantKey } from "@/encryption/conversationCrypto"
 
 type SelectedUser = {
@@ -21,11 +22,6 @@ type SelectedUser = {
   email: string
   name: string
   publicKey: string
-}
-
-function getAuthHeader(): Record<string, string> {
-  const token = localStorage.getItem("accessToken")
-  return token ? { Authorization: `Bearer ${token}` } : {}
 }
 
 async function fetchFullUser(email: string): Promise<SelectedUser | null> {

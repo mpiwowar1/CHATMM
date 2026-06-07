@@ -4,6 +4,7 @@ import { User, Users } from "lucide-react"
 import { cn } from "@/lib/utils"
 import type { ConversationSummaryResponse } from "./chat-types"
 
+/** Conversation list item showing name, time, and preview. */
 function ConversationItem({
   conversation,
   isActive,

@@ -1,6 +1,7 @@
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import type { DecryptedMessage } from "@/hooks/useChat"
 
+/** Message bubble showing sender, time and decrypted text. */
 export function MessageBubble({
   message,
   isOwn,

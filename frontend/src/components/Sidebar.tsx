@@ -5,6 +5,7 @@ import ConversationItem from "./ConversationItem"
 import SidebarUserBlock from "./SidebarUserBlock"
 import NewConversationSheet from "./NewConversationSheet"
 
+/** Sidebar listing conversations and user block. */
 function Sidebar({
   currentUser,
   conversations,

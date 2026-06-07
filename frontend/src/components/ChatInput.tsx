@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Send } from "lucide-react"
 
+/** Simple text input with send button for chat messages. */
 export function ChatInput({ onSend }: { onSend: (plaintext: string) => void }) {
   const [value, setValue] = useState("")
 

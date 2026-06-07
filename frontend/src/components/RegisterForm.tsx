@@ -23,6 +23,7 @@ interface RegisterFormProps {
   onSwitchToLogin: () => void
 }
 
+/** Registration form: generate keys and create a new account. */
 export default function RegisterForm({ onSwitchToLogin }: RegisterFormProps) {
   const [fields, setFields] = useState<Fields>({
     name: "",

@@ -7,6 +7,7 @@ import { ChatInput } from "./ChatInput"
 import { MessageBubble } from "./MessageBubble"
 import { Loader2 } from "lucide-react"
 
+/** Chat area: renders header, message list, and input for a conversation. */
 export function ChatArea({
   currentUserId,
   conversation,
