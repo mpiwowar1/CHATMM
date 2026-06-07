@@ -1,4 +1,3 @@
-/* eslint-disable react-refresh/only-export-components */
 import * as React from "react"
 
 type Theme = "dark" | "light" | "system"
@@ -138,8 +137,6 @@ export function ThemeProvider({
       mediaQuery.removeEventListener("change", handleChange)
     }
   }, [theme, applyTheme])
-
-  // Removed the built-in 'd' hotkey to avoid unexpected theme changes.
 
   React.useEffect(() => {
     const handleStorageChange = (event: StorageEvent) => {

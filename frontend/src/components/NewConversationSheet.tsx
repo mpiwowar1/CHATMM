@@ -16,7 +16,6 @@ import useUserSearch from "@/hooks/useUserSearch"
 import { baseip } from "@/encryption/ip"
 import type { ParticipantKey } from "@/encryption/conversationCrypto"
 
-// Full user shape returned by /users/search
 type SelectedUser = {
   id: number
   email: string
@@ -37,7 +36,7 @@ async function fetchFullUser(email: string): Promise<SelectedUser | null> {
     }
   )
   if (!res.ok) return null
-  return res.json() // { id, email, name, publicKey }
+  return res.json()
 }
 
 export default function NewConversationSheet({
@@ -81,8 +80,6 @@ export default function NewConversationSheet({
       alert("Select at least one user")
       return
     }
-
-    // Pass only id + publicKey — useConversations adds the creator automatically
     const participants: ParticipantKey[] = selected.map(
       ({ id, publicKey }) => ({ id, publicKey })
     )

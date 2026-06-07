@@ -13,8 +13,6 @@ import {
 import { toWsUrl, getToken } from "@/encryption/utils"
 import type { ConversationSummaryResponse } from "@/components/chat-types"
 
-// NOTE: `toWsUrl` and `getToken` are provided by `encryption/utils`
-
 type RawMessage = {
   id: number
   conversationId: number

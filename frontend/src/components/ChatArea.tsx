@@ -34,15 +34,12 @@ export function ChatArea({
   const scrollAreaRef = useRef<HTMLDivElement>(null)
   const prevMessageCountRef = useRef(messages.length)
 
-  // Scroll to bottom only when new messages arrive at the bottom
-  // (not when older messages are prepended via loadMore)
   const lastMessageIdRef = useRef<number | undefined>(undefined)
 
   useEffect(() => {
     const lastMsg = messages[messages.length - 1]
     if (!lastMsg) return
 
-    // Only scroll to bottom if a genuinely new message arrived at the end
     if (lastMsg.id !== lastMessageIdRef.current) {
       const wasAtBottom =
         lastMessageIdRef.current !== undefined &&
@@ -56,14 +53,12 @@ export function ChatArea({
     lastMessageIdRef.current = lastMsg.id
   }, [messages])
 
-  // Scroll to bottom on initial load
   useEffect(() => {
     if (!loading && messages.length > 0) {
       bottomRef.current?.scrollIntoView({ behavior: "instant" })
     }
   }, [loading])
 
-  // Trigger loadMore when user scrolls to the top
   const handleScroll = useCallback(
     (e: React.UIEvent<HTMLDivElement>) => {
       if (e.currentTarget.scrollTop === 0 && hasMore && !loadingMore) {
@@ -83,7 +78,6 @@ export function ChatArea({
         ref={scrollAreaRef}
       >
         <div className="flex flex-col gap-3">
-          {/* Load more trigger at the top */}
           {hasMore && (
             <div className="flex justify-center py-2">
               {loadingMore ? (
@@ -99,21 +93,18 @@ export function ChatArea({
             </div>
           )}
 
-          {/* Initial load spinner */}
           {loading && (
             <div className="flex justify-center py-8">
               <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
             </div>
           )}
 
-          {/* Error banner */}
           {error && (
             <div className="rounded bg-destructive/10 px-3 py-2 text-center text-sm text-destructive">
               {error}
             </div>
           )}
 
-          {/* Messages */}
           {!loading &&
             messages.map((msg, idx) => {
               const isOwn = msg.senderId === currentUserId

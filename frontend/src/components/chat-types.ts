@@ -21,7 +21,7 @@ export interface ConversationSummaryResponse {
   type: ConversationType
   encryptedAesKey: string
   lastMessageAt: string | null
-  lastMessagePreview: string | null   // encrypted ciphertext
+  lastMessagePreview: string | null
   lastMessageIv: string | null
   lastMessageSenderName: string | null
   participants: ConversationParticipantResponse[]

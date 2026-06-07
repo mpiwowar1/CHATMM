@@ -123,7 +123,6 @@ export function useConversations(page = 0, size = 50) {
 
   useEffect(() => {
     fetchConversations()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [page, size])
 
   return {
