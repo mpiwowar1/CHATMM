@@ -19,7 +19,12 @@ type Fields = {
   password: string
 }
 
-export default function RegisterForm() {
+interface RegisterFormProps {
+  onSwitchToLogin: () => void
+}
+
+/** Registration form: generate keys and create a new account. */
+export default function RegisterForm({ onSwitchToLogin }: RegisterFormProps) {
   const [fields, setFields] = useState<Fields>({
     name: "",
     email: "",
@@ -55,7 +60,9 @@ export default function RegisterForm() {
             Enter your Username, Email and password to register.
           </CardDescription>
           <CardAction>
-            <Button variant="link">Log in</Button>
+            <Button variant="link" onClick={onSwitchToLogin}>
+              Log in
+            </Button>
           </CardAction>
         </CardHeader>
         <CardContent>
@@ -106,25 +113,18 @@ export default function RegisterForm() {
           >
             {loading ? "Generating keys…" : "Register"}
           </Button>
-          {status === "success" && <p>Account created!</p>}
-          {error && <p role="alert">{error}</p>}
+          {status === "success" && (
+            <p className="text-sm font-medium text-green-600">
+              Account created!
+            </p>
+          )}
+          {error && (
+            <p role="alert" className="text-sm font-medium text-red-600">
+              {error}
+            </p>
+          )}
         </CardFooter>
       </Card>
     </div>
   )
-}
-
-{
-  /* <div>
-    <input name="name" value={fields.name} onChange={onChange} placeholder="Name" />
-    <input name="email" value={fields.email} onChange={onChange} placeholder="Email" type="email" />
-    <input name="password" value={fields.password} onChange={onChange} placeholder="Password" type="password" />
-
-    <button onClick={onSubmit} disabled={loading}>
-    {loading ? 'Generating keys…' : 'Register'}
-    </button>
-
-    {status === 'success' && <p>Account created!</p>}
-    {error && <p role="alert">{error}</p>}
-</div> */
 }

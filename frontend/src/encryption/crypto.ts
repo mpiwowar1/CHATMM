@@ -1,17 +1,15 @@
 const subtle = window.crypto.subtle
+import { b64 } from "./utils"
 
-const b64 = (buf: ArrayBuffer | Uint8Array): string => {
-  const bytes = buf instanceof Uint8Array ? buf : new Uint8Array(buf)
-  return btoa(String.fromCharCode(...bytes))
+/** Generate a random 16-byte front salt. */
+export function generateSalt(): Uint8Array {
+  return crypto.getRandomValues(new Uint8Array(16))
 }
 
-export function generateSalt(): Uint8Array<ArrayBuffer> {
-  return crypto.getRandomValues(new Uint8Array(16)) as Uint8Array<ArrayBuffer>
-}
-
+/** Derive a symmetric AES-GCM key from a password and salt. */
 export async function deriveKeyFromPassword(
   password: string,
-  salt: Uint8Array<ArrayBuffer>
+  salt: Uint8Array
 ): Promise<CryptoKey> {
   const enc = new TextEncoder().encode(password)
 
@@ -22,7 +20,7 @@ export async function deriveKeyFromPassword(
   return subtle.deriveKey(
     {
       name: "PBKDF2",
-      salt,
+      salt: salt,
       iterations: 310_000,
       hash: "SHA-256",
     },
@@ -31,11 +29,12 @@ export async function deriveKeyFromPassword(
       name: "AES-GCM",
       length: 256,
     },
-    false,
+    true,
     ["encrypt", "decrypt"]
   )
 }
 
+/** Generate an RSA-OAEP key pair for the user. */
 export async function generateRSAKeyPair(): Promise<CryptoKeyPair> {
   return subtle.generateKey(
     {
@@ -49,6 +48,7 @@ export async function generateRSAKeyPair(): Promise<CryptoKeyPair> {
   ) as Promise<CryptoKeyPair>
 }
 
+/** Encrypt an RSA private key with a wrapping AES key and return base64(iv||ciphertext). */
 export async function encryptPrivateKey(
   privateKey: CryptoKey,
   wrappingKey: CryptoKey
@@ -76,11 +76,12 @@ export interface RegistrationPayload {
   name: string
   email: string
   password: string
-  salt: string
-  rsaPublicKey: string
+  frontSalt: string
+  publicKey: string
   encryptedPrivateKey: string
 }
 
+/** Build the registration payload containing public key and encrypted private key. */
 export async function buildRegistrationPayload(
   name: string,
   email: string,
@@ -97,8 +98,8 @@ export async function buildRegistrationPayload(
     email,
     name,
     password,
-    salt: b64(salt),
-    rsaPublicKey: b64(spki),
+    frontSalt: b64(salt),
+    publicKey: b64(spki),
     encryptedPrivateKey: await encryptPrivateKey(privateKey, wrappingKey),
   }
 }
