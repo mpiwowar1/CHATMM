@@ -66,6 +66,8 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile
+      args:
+        VITE_API_URL: ${VITE_API_URL:-http://localhost:8086/api/v1}
     container_name: chatmm-frontend
     restart: unless-stopped
     depends_on:

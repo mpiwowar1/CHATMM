@@ -13,6 +13,11 @@ RUN npm ci --legacy-peer-deps
 # Kopiowanie kodu
 COPY . ./
 
+# Allow passing the API base at build time so Vite can bake it into the static bundle.
+# Example: docker build --build-arg VITE_API_URL=http://host:8086 -t frontend
+ARG VITE_API_URL
+ENV VITE_API_URL=${VITE_API_URL}
+
 # Budowanie (tylko Vite, bez TypeScript type checking)
 RUN npx vite build
 
