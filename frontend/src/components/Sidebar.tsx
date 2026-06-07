@@ -1,13 +1,5 @@
-import { Button } from "@/components/ui/button"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Separator } from "@/components/ui/separator"
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip"
-import { Plus } from "lucide-react"
 import type { ConversationSummaryResponse, UserResponse } from "./chat-types"
 import ConversationItem from "./ConversationItem"
 import SidebarUserBlock from "./SidebarUserBlock"
@@ -20,6 +12,7 @@ function Sidebar({
   activeId,
   onSelect,
   onCreateConversation,
+  onLogout,
 }: {
   currentUser: UserResponse
   conversations: ConversationSummaryResponse[]
@@ -30,6 +23,7 @@ function Sidebar({
     name: string | null,
     participants: ParticipantKey[]
   ) => Promise<number | null>
+  onLogout?: () => void
 }) {
   return (
     <aside className="flex h-screen w-72 shrink-0 flex-col border-r bg-background">
@@ -62,7 +56,7 @@ function Sidebar({
       <Separator />
 
       <div className="px-2 py-2">
-        <SidebarUserBlock user={currentUser} />
+        <SidebarUserBlock user={currentUser} onLogout={onLogout} />
       </div>
     </aside>
   )

@@ -21,7 +21,7 @@ function getCurrentUser(): UserResponse {
   }
 }
 
-export function ChatLayout() {
+export function ChatLayout({ onLogout }: { onLogout?: () => void }) {
   const currentUser = getCurrentUser()
 
   const {
@@ -118,6 +118,7 @@ export function ChatLayout() {
         onSelect={setActiveId}
         onCreateConversation={createConversation}
         decryptedPreviews={mergedPreviews}
+        onLogout={onLogout}
       />
       {activeConversation ? (
         <ChatArea

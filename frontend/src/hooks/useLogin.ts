@@ -3,12 +3,14 @@ import { baseip } from "../encryption/ip"
 import { deriveKeyFromPassword } from "../encryption/crypto"
 import { decryptPrivateKey } from "../encryption/messageCrypto"
 import { storePrivateKey } from "../encryption/keyStore"
+import { wrapAndStorePrivateKey } from "../encryption/deviceKeyStore"
 
 type Status = "idle" | "loading" | "success" | "error"
 
 interface LoginInput {
   email: string
   password: string
+  rememberMe?: boolean
 }
 
 interface AuthResponse {
@@ -21,7 +23,9 @@ interface AuthResponse {
 }
 
 async function fetchSalt(email: string): Promise<string> {
-  const res = await fetch(`${baseip}/auth/salt?email=${encodeURIComponent(email)}`)
+  const res = await fetch(
+    `${baseip}/auth/salt?email=${encodeURIComponent(email)}`
+  )
   if (!res.ok) throw new Error("Could not retrieve account salt.")
   const data = await res.json()
   return data.frontSalt as string
@@ -32,18 +36,22 @@ export function useLogin() {
   const [error, setError] = useState<string | null>(null)
   const [authData, setAuthData] = useState<AuthResponse | null>(null)
 
-  async function login({ email, password }: LoginInput): Promise<void> {
+  async function login({
+    email,
+    password,
+    rememberMe = false,
+  }: LoginInput): Promise<void> {
     setStatus("loading")
     setError(null)
 
     try {
       const deviceId = `device_${Date.now()}_${Math.random().toString(36).substring(2, 15)}`
 
-      // 1. Fetch the per-user salt so we can derive the wrapping key client-side
       const frontSaltB64 = await fetchSalt(email)
-      const saltBytes = Uint8Array.from(atob(frontSaltB64), (c) => c.charCodeAt(0))
+      const saltBytes = Uint8Array.from(atob(frontSaltB64), (c) =>
+        c.charCodeAt(0)
+      )
 
-      // 2. Authenticate with the backend
       const loginRes = await fetch(`${baseip}/auth/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -65,17 +73,30 @@ export function useLogin() {
 
       const data: AuthResponse = await loginRes.json()
 
-      // 3. Derive the wrapping key and decrypt the private key into memory
       const wrappingKey = await deriveKeyFromPassword(password, saltBytes)
-      const privateKey = await decryptPrivateKey(data.encryptedPrivateKey, wrappingKey)
+      const privateKey = await decryptPrivateKey(
+        data.encryptedPrivateKey,
+        wrappingKey
+      )
       storePrivateKey(privateKey)
 
-      // 4. Persist tokens and non-sensitive user info
       localStorage.setItem("accessToken", data.accessToken)
       localStorage.setItem("refreshToken", data.refreshToken)
-      localStorage.setItem("user", JSON.stringify({ id: data.id, email: data.email, name: data.name }))
+      localStorage.setItem(
+        "user",
+        JSON.stringify({ id: data.id, email: data.email, name: data.name })
+      )
       localStorage.setItem("encryptedPrivateKey", data.encryptedPrivateKey)
       localStorage.setItem("deviceId", deviceId)
+
+      // If the user opted in, wrap the private key with the device key and
+      // persist it — no password needed on future refreshes.
+      if (rememberMe) {
+        await wrapAndStorePrivateKey(privateKey)
+        localStorage.setItem("rememberMe", "true")
+      } else {
+        localStorage.removeItem("rememberMe")
+      }
 
       setAuthData(data)
       setStatus("success")

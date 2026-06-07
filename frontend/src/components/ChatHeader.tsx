@@ -33,9 +33,9 @@ function ChatHeader({
         </div>
       </div>
 
-      <Button variant="ghost" size="icon" className="h-8 w-8" onClick={onMore}>
+      {/* <Button variant="ghost" size="icon" className="h-8 w-8" onClick={onMore}>
         <MoreHorizontal className="h-4 w-4" />
-      </Button>
+      </Button> */}
     </div>
   )
 }

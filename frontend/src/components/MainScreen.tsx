@@ -1,9 +1,9 @@
 import ChatLayout from "./chat-layout"
 
-export default function MainScreen() {
-  return (
-    <>
-      <ChatLayout></ChatLayout>
-    </>
-  )
+interface MainScreenProps {
+  onLogout?: () => void
+}
+
+export default function MainScreen({ onLogout }: MainScreenProps) {
+  return <ChatLayout onLogout={onLogout} />
 }

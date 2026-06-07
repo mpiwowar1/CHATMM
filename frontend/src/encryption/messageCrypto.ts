@@ -20,13 +20,16 @@ export async function decryptPrivateKey(
   const iv = bytes.slice(0, 12)
   const ciphertext = bytes.slice(12)
 
-  const pkcs8 = await subtle.decrypt({ name: "AES-GCM", iv }, wrappingKey, ciphertext)
-
+  const pkcs8 = await subtle.decrypt(
+    { name: "AES-GCM", iv },
+    wrappingKey,
+    ciphertext
+  )
   return subtle.importKey(
     "pkcs8",
     pkcs8,
     { name: "RSA-OAEP", hash: "SHA-256" },
-    false,
+    true,
     ["decrypt"]
   )
 }
@@ -41,7 +44,11 @@ export async function decryptConversationKey(
 ): Promise<CryptoKey> {
   const encrypted = fromB64(encryptedAesKeyB64)
 
-  const rawAes = await subtle.decrypt({ name: "RSA-OAEP" }, privateKey, encrypted)
+  const rawAes = await subtle.decrypt(
+    { name: "RSA-OAEP" },
+    privateKey,
+    encrypted
+  )
 
   return subtle.importKey(
     "raw",
@@ -60,7 +67,11 @@ export async function encryptMessage(
   const iv = crypto.getRandomValues(new Uint8Array(12))
   const encoded = new TextEncoder().encode(plaintext)
 
-  const ciphertextBuf = await subtle.encrypt({ name: "AES-GCM", iv }, aesKey, encoded)
+  const ciphertextBuf = await subtle.encrypt(
+    { name: "AES-GCM", iv },
+    aesKey,
+    encoded
+  )
 
   return { ciphertext: b64(ciphertextBuf), iv: b64(iv) }
 }
@@ -74,7 +85,11 @@ export async function decryptMessage(
   const ciphertext = fromB64(ciphertextB64)
   const iv = fromB64(ivB64)
 
-  const plaintext = await subtle.decrypt({ name: "AES-GCM", iv }, aesKey, ciphertext)
+  const plaintext = await subtle.decrypt(
+    { name: "AES-GCM", iv },
+    aesKey,
+    ciphertext
+  )
 
   return new TextDecoder().decode(plaintext)
 }

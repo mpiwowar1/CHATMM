@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react"
 import { useLogin } from "../hooks/useLogin"
 import { Button } from "@/components/ui/button"
+import { Checkbox } from "@/components/ui/checkbox"
 import {
   Card,
   CardAction,
@@ -27,10 +28,8 @@ export default function LoginForm({
   onSwitchToRegister,
   onLoggingIn,
 }: LoginFormProps) {
-  const [fields, setFields] = useState<Fields>({
-    email: "",
-    password: "",
-  })
+  const [fields, setFields] = useState<Fields>({ email: "", password: "" })
+  const [rememberMe, setRememberMe] = useState(false)
 
   const { login, status, error, authData } = useLogin()
 
@@ -42,22 +41,17 @@ export default function LoginForm({
 
   const onChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target
-
-    setFields((f) => ({
-      ...f,
-      [name]: value,
-    }))
+    setFields((f) => ({ ...f, [name]: value }))
   }
 
   const onSubmit = async () => {
     if (fields.email && fields.password) {
-      await login(fields)
+      await login({ ...fields, rememberMe })
     }
   }
 
   const loading = status === "loading"
 
-  // If login successful, show welcome message
   if (status === "success" && authData) {
     return (
       <div className="flex min-h-screen items-center justify-center">
@@ -93,41 +87,44 @@ export default function LoginForm({
           </CardAction>
         </CardHeader>
         <CardContent>
-          <form>
-            <div className="flex flex-col gap-6">
-              <div className="grid gap-2">
-                <Label htmlFor="email">Email</Label>
-                <Input
-                  name="email"
-                  id="email"
-                  type="email"
-                  placeholder="m@example.com"
-                  onChange={onChange}
-                  value={fields.email}
-                  required
-                />
-              </div>
-              <div className="grid gap-2">
-                <div className="flex items-center">
-                  <Label htmlFor="password">Password</Label>
-                  <a
-                    href="#"
-                    className="ml-auto inline-block text-sm underline-offset-4 hover:underline"
-                  >
-                    Forgot your password?
-                  </a>
-                </div>
-                <Input
-                  id="password"
-                  name="password"
-                  type="password"
-                  onChange={onChange}
-                  value={fields.password}
-                  required
-                />
-              </div>
+          <div className="flex flex-col gap-6">
+            <div className="grid gap-2">
+              <Label htmlFor="email">Email</Label>
+              <Input
+                name="email"
+                id="email"
+                type="email"
+                placeholder="m@example.com"
+                onChange={onChange}
+                value={fields.email}
+                required
+              />
             </div>
-          </form>
+            <div className="grid gap-2">
+              <Label htmlFor="password">Password</Label>
+              <Input
+                id="password"
+                name="password"
+                type="password"
+                onChange={onChange}
+                value={fields.password}
+                required
+              />
+            </div>
+            <div className="flex items-center gap-2">
+              <Checkbox
+                id="rememberMe"
+                checked={rememberMe}
+                onCheckedChange={(checked) => setRememberMe(checked === true)}
+              />
+              <Label
+                htmlFor="rememberMe"
+                className="cursor-pointer text-sm font-normal select-none"
+              >
+                Remember me on this device
+              </Label>
+            </div>
+          </div>
         </CardContent>
         <CardFooter className="flex-col gap-2">
           <Button
