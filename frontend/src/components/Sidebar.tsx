@@ -44,10 +44,9 @@ function Sidebar({
           />
         </div>
       </div>
-
       <Separator />
 
-      <ScrollArea className="flex-1 px-2 py-2">
+      <ScrollArea className="min-h-0 flex-1 px-2 py-2">
         <div className="flex flex-col gap-0.5">
           {conversations.map((c) => (
             <ConversationItem
@@ -60,7 +59,6 @@ function Sidebar({
           ))}
         </div>
       </ScrollArea>
-
       <Separator />
 
       <div className="px-2 py-2">
