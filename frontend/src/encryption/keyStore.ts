@@ -19,10 +19,17 @@ export function clearPrivateKey(): void {
   _conversationKeys.clear()
 }
 
-export function cacheConversationKey(conversationId: number, key: CryptoKey): void {
+/** Cache a conversation AES key in-memory for the session. */
+export function cacheConversationKey(
+  conversationId: number,
+  key: CryptoKey
+): void {
   _conversationKeys.set(conversationId, key)
 }
 
-export function getCachedConversationKey(conversationId: number): CryptoKey | null {
+/** Retrieve a cached conversation AES key or null. */
+export function getCachedConversationKey(
+  conversationId: number
+): CryptoKey | null {
   return _conversationKeys.get(conversationId) ?? null
 }

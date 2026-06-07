@@ -1,17 +1,7 @@
 const subtle = window.crypto.subtle
+import { b64, fromB64 } from "./utils"
 
-const b64 = (buf: ArrayBuffer | Uint8Array): string => {
-  const bytes = buf instanceof Uint8Array ? buf : new Uint8Array(buf)
-  return btoa(String.fromCharCode(...bytes))
-}
-
-const fromB64 = (s: string): Uint8Array =>
-  Uint8Array.from(atob(s), (c) => c.charCodeAt(0))
-
-/**
- * Decrypt the user's stored private key.
- * Format: base64(12-byte IV || AES-GCM ciphertext of PKCS8)
- */
+/** Decrypt the user's encrypted private key using a wrapping AES key. */
 export async function decryptPrivateKey(
   encryptedPrivateKeyB64: string,
   wrappingKey: CryptoKey
@@ -34,10 +24,7 @@ export async function decryptPrivateKey(
   )
 }
 
-/**
- * Decrypt the per-conversation AES key using the user's RSA private key.
- * encryptedAesKeyB64 is what the backend stores as Participant.encryptedAesKey.
- */
+/** Decrypt a per-conversation AES key using the user's RSA private key. */
 export async function decryptConversationKey(
   encryptedAesKeyB64: string,
   privateKey: CryptoKey
@@ -59,7 +46,7 @@ export async function decryptConversationKey(
   )
 }
 
-/** Encrypt a plaintext string with the conversation AES key */
+/** Encrypt a plaintext string with the conversation AES key. */
 export async function encryptMessage(
   plaintext: string,
   aesKey: CryptoKey
@@ -76,7 +63,7 @@ export async function encryptMessage(
   return { ciphertext: b64(ciphertextBuf), iv: b64(iv) }
 }
 
-/** Decrypt a ciphertext+iv pair with the conversation AES key */
+/** Decrypt a ciphertext+iv pair with the conversation AES key. */
 export async function decryptMessage(
   ciphertextB64: string,
   ivB64: string,

@@ -1,16 +1,13 @@
 import { useEffect, useState } from "react"
 import { baseip } from "@/encryption/ip"
-
-function getAuthHeader(): Record<string, string> {
-  const token = localStorage.getItem("accessToken")
-  return token ? { Authorization: `Bearer ${token}` } : {}
-}
+import { getAuthHeader } from "@/encryption/utils"
 
 export type AutocompleteUser = {
   name: string
   email: string
 }
 
+/** Hook to search users for autocomplete (debounced). */
 export function useUserSearch(query: string, limit = 6, enabled = true) {
   const [results, setResults] = useState<AutocompleteUser[]>([])
   const [loading, setLoading] = useState(false)
@@ -37,7 +34,7 @@ export function useUserSearch(query: string, limit = 6, enabled = true) {
         const res = await fetch(
           `${baseip}/users/autocomplete?query=${encodeURIComponent(query)}&limit=${limit}`,
           {
-            headers: getAuthHeader(), // ← was missing
+            headers: getAuthHeader(),
             signal: controller.signal,
           }
         )
@@ -67,7 +64,7 @@ export function useUserSearch(query: string, limit = 6, enabled = true) {
       controller.abort()
       clearTimeout(t)
     }
-  }, [query, limit, enabled]) // ← added `enabled`
+  }, [query, limit, enabled])
 
   return { results, loading, error }
 }

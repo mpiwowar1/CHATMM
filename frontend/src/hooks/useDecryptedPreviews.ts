@@ -10,6 +10,7 @@ import {
 } from "@/encryption/messageCrypto"
 import type { ConversationSummaryResponse } from "@/components/chat-types"
 
+/** Resolve or retrieve cached AES key for a conversation. */
 async function resolveAesKey(
   conversationId: number,
   encryptedAesKey: string
@@ -29,6 +30,7 @@ async function resolveAesKey(
   }
 }
 
+/** Decrypt the stored preview text for a conversation (if present). */
 async function decryptPreview(
   conv: ConversationSummaryResponse
 ): Promise<string | null> {
@@ -48,6 +50,7 @@ async function decryptPreview(
   }
 }
 
+/** Hook that provides decrypted previews for a list of conversations. */
 export function useDecryptedPreviews(
   conversations: ConversationSummaryResponse[]
 ): Record<number, string> {

@@ -1,17 +1,13 @@
 const subtle = window.crypto.subtle
-
-const b64 = (buf: ArrayBuffer | Uint8Array): string => {
-  const bytes = buf instanceof Uint8Array ? buf : new Uint8Array(buf)
-  return btoa(String.fromCharCode(...bytes))
-}
+import { b64 } from "./utils"
 
 /** Generate a fresh AES-256-GCM key for a conversation */
+/** Create a new AES-256-GCM key for a conversation. */
 export async function generateConversationKey(): Promise<CryptoKey> {
-  return subtle.generateKey(
-    { name: "AES-GCM", length: 256 },
-    true,
-    ["encrypt", "decrypt"]
-  )
+  return subtle.generateKey({ name: "AES-GCM", length: 256 }, true, [
+    "encrypt",
+    "decrypt",
+  ])
 }
 
 /**
@@ -19,6 +15,7 @@ export async function generateConversationKey(): Promise<CryptoKey> {
  * publicKeyB64 is the base64-encoded SPKI bytes stored in the backend.
  * Returns base64-encoded ciphertext to store as encryptedAesKey.
  */
+/** Encrypt the raw AES key for a participant using their RSA public key. */
 export async function encryptKeyForParticipant(
   aesKey: CryptoKey,
   publicKeyB64: string
@@ -53,6 +50,7 @@ export type ParticipantKey = {
  * Build the participantKeys map the backend expects:
  * { [userId]: base64(RSA-OAEP encrypted AES key) }
  */
+/** Build the participant -> encryptedKey map expected by the backend. */
 export async function buildParticipantKeysMap(
   participants: ParticipantKey[]
 ): Promise<Record<number, string>> {

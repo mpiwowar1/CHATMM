@@ -14,6 +14,7 @@ export function useRegister() {
   const [status, setStatus] = useState<Status>("idle")
   const [error, setError] = useState<string | null>(null)
 
+  /** Register a new user by building a payload and POSTing to the API. */
   async function register({
     name,
     email,
@@ -51,8 +52,7 @@ export function useRegister() {
           ) {
             message = (data as any).title
           }
-        } catch {
-        }
+        } catch {}
 
         throw new Error(message)
       }

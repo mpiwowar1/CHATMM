@@ -1,14 +1,12 @@
 const subtle = window.crypto.subtle
+import { b64 } from "./utils"
 
-const b64 = (buf: ArrayBuffer | Uint8Array): string => {
-  const bytes = buf instanceof Uint8Array ? buf : new Uint8Array(buf)
-  return btoa(String.fromCharCode(...bytes))
-}
-
+/** Generate a random 16-byte front salt. */
 export function generateSalt(): Uint8Array {
   return crypto.getRandomValues(new Uint8Array(16))
 }
 
+/** Derive a symmetric AES-GCM key from a password and salt. */
 export async function deriveKeyFromPassword(
   password: string,
   salt: Uint8Array
@@ -36,6 +34,7 @@ export async function deriveKeyFromPassword(
   )
 }
 
+/** Generate an RSA-OAEP key pair for the user. */
 export async function generateRSAKeyPair(): Promise<CryptoKeyPair> {
   return subtle.generateKey(
     {
@@ -49,6 +48,7 @@ export async function generateRSAKeyPair(): Promise<CryptoKeyPair> {
   ) as Promise<CryptoKeyPair>
 }
 
+/** Encrypt an RSA private key with a wrapping AES key and return base64(iv||ciphertext). */
 export async function encryptPrivateKey(
   privateKey: CryptoKey,
   wrappingKey: CryptoKey
@@ -81,6 +81,7 @@ export interface RegistrationPayload {
   encryptedPrivateKey: string
 }
 
+/** Build the registration payload containing public key and encrypted private key. */
 export async function buildRegistrationPayload(
   name: string,
   email: string,

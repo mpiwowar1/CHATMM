@@ -1,15 +1,11 @@
 import { useEffect, useState } from "react"
 import { baseip } from "@/encryption/ip"
+import { getAuthHeader } from "@/encryption/utils"
 import {
   buildParticipantKeysMap,
   type ParticipantKey,
 } from "@/encryption/conversationCrypto"
 import type { ConversationSummaryResponse } from "@/components/chat-types"
-
-function getAuthHeader(): Record<string, string> {
-  const token = localStorage.getItem("accessToken")
-  return token ? { Authorization: `Bearer ${token}` } : {}
-}
 
 async function fetchMyPublicKey(): Promise<ParticipantKey> {
   const res = await fetch(`${baseip}/users/me`, {
@@ -20,6 +16,7 @@ async function fetchMyPublicKey(): Promise<ParticipantKey> {
   return { id: data.id, publicKey: data.publicKey }
 }
 
+/** Hook to list and manage conversation summaries. */
 export function useConversations(page = 0, size = 50) {
   const [conversations, setConversations] = useState<
     ConversationSummaryResponse[]
@@ -27,12 +24,14 @@ export function useConversations(page = 0, size = 50) {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
+  /** Add conversation to the top of the list if not already present. */
   function addConversation(conv: ConversationSummaryResponse) {
     setConversations((prev) =>
       prev.some((c) => c.id === conv.id) ? prev : [conv, ...prev]
     )
   }
 
+  /** Update last message preview metadata for a conversation. */
   function updateConversationPreview(
     conversationId: number,
     senderName: string,

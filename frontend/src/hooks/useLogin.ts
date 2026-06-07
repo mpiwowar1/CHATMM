@@ -22,6 +22,7 @@ interface AuthResponse {
   encryptedPrivateKey: string
 }
 
+/** Fetch account-specific front salt used for client key derivation. */
 async function fetchSalt(email: string): Promise<string> {
   const res = await fetch(
     `${baseip}/auth/salt?email=${encodeURIComponent(email)}`
@@ -31,6 +32,7 @@ async function fetchSalt(email: string): Promise<string> {
   return data.frontSalt as string
 }
 
+/** Hook to perform login, derive keys and optionally wrap the private key to device. */
 export function useLogin() {
   const [status, setStatus] = useState<Status>("idle")
   const [error, setError] = useState<string | null>(null)
@@ -89,8 +91,6 @@ export function useLogin() {
       localStorage.setItem("encryptedPrivateKey", data.encryptedPrivateKey)
       localStorage.setItem("deviceId", deviceId)
 
-      // If the user opted in, wrap the private key with the device key and
-      // persist it — no password needed on future refreshes.
       if (rememberMe) {
         await wrapAndStorePrivateKey(privateKey)
         localStorage.setItem("rememberMe", "true")

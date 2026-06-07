@@ -10,17 +10,10 @@ import {
   decryptConversationKey,
   decryptMessage,
 } from "@/encryption/messageCrypto"
+import { toWsUrl, getToken } from "@/encryption/utils"
 import type { ConversationSummaryResponse } from "@/components/chat-types"
 
-function toWsUrl(base: string): string {
-  const url = new URL(base)
-  const basePath = url.pathname.replace(/\/$/, "")
-  return `${url.protocol.replace("http", "ws")}//${url.host}${basePath}/ws`
-}
-
-function getToken(): string | null {
-  return localStorage.getItem("accessToken")
-}
+// NOTE: `toWsUrl` and `getToken` are provided by `encryption/utils`
 
 type RawMessage = {
   id: number
@@ -80,7 +73,6 @@ export function useGlobalMessages(
           conversationTopic: conv.id,
         })
 
-        // Skip active conversation — useChat handles that one
         if (raw.conversationId === activeConversationId) return
 
         let aesKey = getCachedConversationKey(conv.id)
@@ -111,6 +103,10 @@ export function useGlobalMessages(
     )
   }
 
+  /**
+   * Hook-level STOMP: subscribe to per-conversation topics and handle preview updates.
+   */
+
   useEffect(() => {
     const token = getToken()
     if (!token) {
@@ -125,21 +121,17 @@ export function useGlobalMessages(
       onConnect: () => {
         console.info("Global STOMP connected")
 
-        // Subscribe to all existing conversations
         conversationsRef.current.forEach((conv) =>
           subscribeToConversation(client, conv)
         )
 
-        // Subscribe to new conversation notifications
         client.subscribe(`/user/queue/conversations`, (frame: IMessage) => {
           console.info("New conversation notification arrived", frame.body)
           const newConv: ConversationSummaryResponse = JSON.parse(frame.body)
           console.info("Received new conversation notification", newConv)
 
-          // Subscribe to its topic immediately so messages start arriving
           subscribeToConversation(client, newConv)
 
-          // Notify ChatLayout to add it to the list
           onNewConversationRef.current(newConv)
         })
       },
@@ -157,7 +149,6 @@ export function useGlobalMessages(
     }
   }, [])
 
-  // Subscribe to any newly added conversations
   useEffect(() => {
     const client = stompRef.current
     if (!client?.connected) return

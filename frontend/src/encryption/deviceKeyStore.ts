@@ -5,6 +5,7 @@ const DEVICE_KEY_ID = "deviceKey"
 const WRAPPED_KEY_LS = "wrappedPrivateKey"
 const WRAPPED_IV_LS = "wrappedPrivateKeyIv"
 
+/** Open (and initialize) the device IndexedDB store. */
 function openDb(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
     const req = indexedDB.open(DB_NAME, DB_VERSION)
@@ -14,6 +15,7 @@ function openDb(): Promise<IDBDatabase> {
   })
 }
 
+/** Read a CryptoKey from the IndexedDB store by key. */
 function idbGet(db: IDBDatabase, key: string): Promise<CryptoKey | undefined> {
   return new Promise((resolve, reject) => {
     const tx = db.transaction(STORE_NAME, "readonly")
@@ -23,6 +25,7 @@ function idbGet(db: IDBDatabase, key: string): Promise<CryptoKey | undefined> {
   })
 }
 
+/** Store a CryptoKey in IndexedDB under the given key. */
 function idbSet(db: IDBDatabase, key: string, value: CryptoKey): Promise<void> {
   return new Promise((resolve, reject) => {
     const tx = db.transaction(STORE_NAME, "readwrite")
@@ -32,6 +35,7 @@ function idbSet(db: IDBDatabase, key: string, value: CryptoKey): Promise<void> {
   })
 }
 
+/** Delete an entry from the device IndexedDB store. */
 function idbDelete(db: IDBDatabase, key: string): Promise<void> {
   return new Promise((resolve, reject) => {
     const tx = db.transaction(STORE_NAME, "readwrite")
@@ -55,16 +59,18 @@ async function getOrCreateDeviceKey(): Promise<CryptoKey> {
   return key
 }
 
+/** Return stored device AES key or null. */
 async function getDeviceKey(): Promise<CryptoKey | null> {
   const db = await openDb()
   return (await idbGet(db, DEVICE_KEY_ID)) ?? null
 }
 
-const b64 = (buf: ArrayBuffer): string =>
-  btoa(String.fromCharCode(...new Uint8Array(buf)))
-const fromB64 = (s: string): Uint8Array =>
-  Uint8Array.from(atob(s), (c) => c.charCodeAt(0))
+import { b64, fromB64 } from "./utils"
 
+/** Convert ArrayBuffer to base64 string. */
+// `b64` imported from utils
+
+/** Wrap an RSA private key with the device key and persist in localStorage. */
 export async function wrapAndStorePrivateKey(
   privateKey: CryptoKey
 ): Promise<void> {
@@ -80,6 +86,7 @@ export async function wrapAndStorePrivateKey(
   localStorage.setItem(WRAPPED_IV_LS, b64(iv))
 }
 
+/** Load and unwrap a previously wrapped private key from localStorage. */
 export async function loadWrappedPrivateKey(): Promise<CryptoKey | null> {
   const wrappedB64 = localStorage.getItem(WRAPPED_KEY_LS)
   const ivB64 = localStorage.getItem(WRAPPED_IV_LS)
@@ -107,6 +114,7 @@ export async function loadWrappedPrivateKey(): Promise<CryptoKey | null> {
   }
 }
 
+/** Clear device key entries from localStorage and IndexedDB. */
 export async function clearDeviceKeyStore(): Promise<void> {
   localStorage.removeItem(WRAPPED_KEY_LS)
   localStorage.removeItem(WRAPPED_IV_LS)

@@ -11,6 +11,7 @@ import {
   cacheConversationKey,
   getCachedConversationKey,
 } from "@/encryption/keyStore"
+import { toWsUrl, getToken, getAuthHeader } from "@/encryption/utils"
 
 export type DecryptedMessage = {
   id: number
@@ -32,22 +33,11 @@ type RawMessage = {
   timestamp: string
 }
 
-// Strip /api/v1 (or similar) path — WebSocket endpoint is at the root
-function toWsUrl(base: string): string {
-  const url = new URL(base)
-  const basePath = url.pathname.replace(/\/$/, "") // strips trailing slash
-  return `${url.protocol.replace("http", "ws")}//${url.host}${basePath}/ws`
-}
+// NOTE: shared helpers imported from encryption/utils.ts
 
-function getToken(): string | null {
-  return localStorage.getItem("accessToken")
-}
-
-function getAuthHeaders() {
-  const token = getToken()
-  return token ? { Authorization: `Bearer ${token}` } : {}
-}
-
+/**
+ * Get cached AES key for a conversation or decrypt it with the session RSA key.
+ */
 async function getOrDecryptConversationKey(
   conversationId: number,
   encryptedAesKey: string
@@ -71,6 +61,9 @@ async function getOrDecryptConversationKey(
   }
 }
 
+/**
+ * Decrypt a RawMessage into a DecryptedMessage using the conversation AES key.
+ */
 async function decryptRaw(
   msg: RawMessage,
   aesKey: CryptoKey
@@ -83,6 +76,9 @@ async function decryptRaw(
   }
 }
 
+/**
+ * Fetch paginated raw message history for a conversation from the API.
+ */
 async function fetchHistory(
   conversationId: number,
   cursor: number | null,
@@ -97,13 +93,16 @@ async function fetchHistory(
 
   const res = await fetch(
     `${baseip}/conversations/${conversationId}/messages?${params}`,
-    { headers: { "Content-Type": "application/json", ...getAuthHeaders() } }
+    { headers: { "Content-Type": "application/json", ...getAuthHeader() } }
   )
 
   if (!res.ok) throw new Error("Failed to load messages")
   return res.json()
 }
 
+/**
+ * Hook managing messages, history loading and STOMP for a conversation.
+ */
 export function useChat(
   conversationId: number | null,
   encryptedAesKey: string | null
