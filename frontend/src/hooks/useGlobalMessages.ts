@@ -135,7 +135,7 @@ export function useGlobalMessages(
       },
       onStompError: async (frame) => {
         console.error("Global STOMP error", frame)
-        const ok = await refreshToken(4, 500)
+        const ok = await refreshToken(4, 500, false, true)
         if (!ok) return
 
         const newToken = getToken()

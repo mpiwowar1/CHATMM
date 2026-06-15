@@ -166,7 +166,7 @@ export function useChat(
     } finally {
       setLoading(false)
     }
-  }, [conversationId]) // ← encryptedAesKey removed, using ref instead
+  }, [conversationId])
 
   const loadMore = useCallback(async () => {
     if (!conversationId || !aesKeyRef.current || !hasMore || loadingMore) return
@@ -234,9 +234,8 @@ export function useChat(
         console.error("STOMP error", frame)
         setError("WebSocket connection error")
 
-        const ok = await refreshToken(4, 500)
+        const ok = await refreshToken(4, 500, false, true)
         if (!ok) return
-
         const newToken = getToken()
         if (!newToken) return
 

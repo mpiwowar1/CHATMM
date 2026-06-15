@@ -36,7 +36,9 @@ function sleep(ms: number) {
  */
 export async function refreshToken(
   attempts = 3,
-  baseDelay = 500
+  baseDelay = 500,
+  reloadOnSuccess = false,
+  dispatchEventOnSuccess = false
 ): Promise<boolean> {
   const refresh = localStorage.getItem("refreshToken")
   if (!refresh) return false
@@ -64,6 +66,22 @@ export async function refreshToken(
         if (typeof data.refreshToken === "string") {
           localStorage.setItem("refreshToken", data.refreshToken)
         }
+        if (dispatchEventOnSuccess && typeof window !== "undefined") {
+          try {
+            window.dispatchEvent(
+              new CustomEvent("auth:refreshed", {
+                detail: {
+                  accessToken: data.accessToken,
+                  refreshToken: data.refreshToken,
+                },
+              })
+            )
+          } catch {}
+        }
+        if (reloadOnSuccess && typeof window !== "undefined") {
+          window.location.reload()
+        }
+
         return true
       }
     } catch (_) {}

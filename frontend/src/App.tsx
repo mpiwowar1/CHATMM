@@ -21,6 +21,7 @@ export function App() {
   const [view, setView] = useState<View>(
     shouldRestore() ? "restoring" : "login"
   )
+  const [authVersion, setAuthVersion] = useState(0)
 
   useEffect(() => {
     if (view !== "restoring") return
@@ -33,6 +34,13 @@ export function App() {
         setView("login")
       }
     })
+  }, [])
+
+  useEffect(() => {
+    const handler = () => setAuthVersion((v) => v + 1)
+    window.addEventListener("auth:refreshed", handler as EventListener)
+    return () =>
+      window.removeEventListener("auth:refreshed", handler as EventListener)
   }, [])
 
   async function handleLogout() {
@@ -65,7 +73,7 @@ export function App() {
       ) : view === "register" ? (
         <RegisterForm onSwitchToLogin={() => setView("login")} />
       ) : (
-        <MainScreen onLogout={handleLogout} />
+        <MainScreen onLogout={handleLogout} authVersion={authVersion} />
       )}
     </>
   )
