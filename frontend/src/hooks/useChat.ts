@@ -11,16 +11,21 @@ import {
   cacheConversationKey,
   getCachedConversationKey,
 } from "@/encryption/keyStore"
-import { toWsUrl, getToken, getAuthHeader } from "@/encryption/utils"
+import {
+  toWsUrl,
+  getToken,
+  getAuthHeader,
+  refreshToken,
+} from "@/encryption/utils"
 
 export type DecryptedMessage = {
   id: number
   conversationId: number
   senderId: number
   senderName: string
-  text: string // decrypted plaintext
+  text: string
   timestamp: string
-  failed?: boolean // true if decryption failed
+  failed?: boolean
 }
 
 type RawMessage = {
@@ -32,8 +37,6 @@ type RawMessage = {
   iv: string
   timestamp: string
 }
-
-// NOTE: shared helpers imported from encryption/utils.ts
 
 /**
  * Get cached AES key for a conversation or decrypt it with the session RSA key.
@@ -163,7 +166,7 @@ export function useChat(
     } finally {
       setLoading(false)
     }
-  }, [conversationId]) // ← encryptedAesKey removed, using ref instead
+  }, [conversationId])
 
   const loadMore = useCallback(async () => {
     if (!conversationId || !aesKeyRef.current || !hasMore || loadingMore) return
@@ -208,7 +211,6 @@ export function useChat(
           async (frame: IMessage) => {
             const raw: RawMessage = JSON.parse(frame.body)
 
-            // Always resolve fresh — uses ref so we always have the latest key
             let aesKey = aesKeyRef.current
             if (!aesKey && encryptedAesKeyRef.current) {
               aesKey = await getOrDecryptConversationKey(
@@ -228,9 +230,21 @@ export function useChat(
         )
       },
       onDisconnect: () => setConnected(false),
-      onStompError: (frame) => {
+      onStompError: async (frame) => {
         console.error("STOMP error", frame)
         setError("WebSocket connection error")
+
+        const ok = await refreshToken(4, 500, false, true)
+        if (!ok) return
+        const newToken = getToken()
+        if (!newToken) return
+
+        try {
+          client.deactivate()
+        } catch {}
+
+        client.connectHeaders = { Authorization: `Bearer ${newToken}` }
+        client.activate()
       },
     })
 
@@ -242,7 +256,7 @@ export function useChat(
       stompRef.current = null
       setConnected(false)
     }
-  }, [conversationId]) // ← no encryptedAesKey dep, uses ref
+  }, [conversationId])
 
   useEffect(() => {
     setMessages([])
