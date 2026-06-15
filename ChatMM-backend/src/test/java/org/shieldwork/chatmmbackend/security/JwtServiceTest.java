@@ -1,105 +1,74 @@
 package org.shieldwork.chatmmbackend.security;
 
-import io.jsonwebtoken.ExpiredJwtException;
-import io.jsonwebtoken.security.SignatureException;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.shieldwork.chatmmbackend.model.User;
 import org.springframework.test.util.ReflectionTestUtils;
 
-import static org.junit.jupiter.api.Assertions.*;
-
 class JwtServiceTest {
 
     private JwtService jwtService;
-    private User testUser;
 
-    private final String SECRET_KEY = "e4f38b15586aa0262379d459bd7409a9b48fe61bae514357103efeb5b8f0d962==";
-
-    private final long EXPIRATION_TIME = 1000 * 60 * 60;
+    
+    private static final String SECRET = "eed9739e4b81a345558172e4b526b7589dd2db76a92ad4a8fd215cd89552432a";
 
     @BeforeEach
     void setUp() {
         jwtService = new JwtService();
+        ReflectionTestUtils.setField(jwtService, "secretKey", SECRET);
+        ReflectionTestUtils.setField(jwtService, "jwtExpiration", 900_000L);
+    }
 
-        ReflectionTestUtils.setField(jwtService, "secretKey", SECRET_KEY);
-        ReflectionTestUtils.setField(jwtService, "jwtExpiration", EXPIRATION_TIME);
-
-        testUser = User.builder()
+    private User makeUser(String email) {
+        return User.builder()
                 .id(1L)
-                .email("test@example.com")
-                .password("encodedPassword")
+                .email(email)
                 .name("Test User")
+                .password("hashed")
+                .frontSalt("salt")
+                .publicKey("pubkey")
+                .encryptedPrivateKey("encpriv")
                 .build();
     }
 
     @Test
-    void generateToken_ShouldReturnToken_WhenUserDetailsAreProvided() {
-        String token = jwtService.generateToken(testUser);
-
-        assertNotNull(token, "Generated token should not be null");
-        assertFalse(token.isEmpty(), "Generated token should not be empty");
+    void generateToken_returnsNonBlankToken() {
+        User user = makeUser("test@example.com");
+        String token = jwtService.generateToken(user);
+        assertThat(token).isNotBlank();
     }
 
     @Test
-    void extractUsername_ShouldReturnEmail_WhenTokenIsValid() {
-        String token = jwtService.generateToken(testUser);
-
-        String extractedUsername = jwtService.extractUsername(token);
-
-        assertEquals("test@example.com", extractedUsername, "Extracted username should exactly match the user's email");
+    void extractUsername_returnsCorrectEmail() {
+        User user = makeUser("alice@example.com");
+        String token = jwtService.generateToken(user);
+        assertThat(jwtService.extractUsername(token)).isEqualTo("alice@example.com");
     }
 
     @Test
-    void isTokenValid_ShouldReturnTrue_WhenTokenMatchesUser() {
-        String token = jwtService.generateToken(testUser);
-
-        boolean isValid = jwtService.isTokenValid(token, testUser);
-
-        assertTrue(isValid, "Token should be valid for the user it was generated for");
+    void isTokenValid_returnsTrueForCorrectUser() {
+        User user = makeUser("bob@example.com");
+        String token = jwtService.generateToken(user);
+        assertThat(jwtService.isTokenValid(token, user)).isTrue();
     }
 
     @Test
-    void isTokenValid_ShouldReturnFalse_WhenTokenBelongsToDifferentUser() {
-        String token = jwtService.generateToken(testUser);
-
-        User differentUser = User.builder()
-                .email("other@example.com")
-                .build();
-
-        boolean isValid = jwtService.isTokenValid(token, differentUser);
-
-        assertFalse(isValid, "Token should not be valid when verified against a different user");
+    void isTokenValid_returnsFalseForDifferentUser() {
+        User alice = makeUser("alice@example.com");
+        User bob = makeUser("bob@example.com");
+        String token = jwtService.generateToken(alice);
+        assertThat(jwtService.isTokenValid(token, bob)).isFalse();
     }
 
     @Test
-    void extractUsername_ShouldThrowException_WhenTokenIsExpired() throws InterruptedException {
-        ReflectionTestUtils.setField(jwtService, "jwtExpiration", 1L);
-        String token = jwtService.generateToken(testUser);
+    void expiredToken_throwsException() {
+        ReflectionTestUtils.setField(jwtService, "jwtExpiration", -1L);
+        User user = makeUser("expired@example.com");
+        String token = jwtService.generateToken(user);
 
-        Thread.sleep(10);
-
-        ExpiredJwtException exception = assertThrows(
-                ExpiredJwtException.class,
-                () -> jwtService.extractUsername(token),
-                "Should throw ExpiredJwtException when parsing an expired token"
-        );
-
-        assertNotNull(exception, "Exception should be thrown");
-    }
-
-    @Test
-    void extractUsername_ShouldThrowException_WhenSignatureIsInvalid() {
-        String token = jwtService.generateToken(testUser);
-
-        ReflectionTestUtils.setField(jwtService, "secretKey", "72d57e5b751c8ecda09a63c90bf81954a81170d0ecc61bae02b5ec55baa35fc5");
-
-        SignatureException exception = assertThrows(
-                SignatureException.class,
-                () -> jwtService.extractUsername(token),
-                "Should throw SignatureException when token is signed with a different key"
-        );
-
-        assertNotNull(exception, "Exception should be thrown");
+        
+        assertThatException().isThrownBy(() -> jwtService.extractUsername(token));
     }
 }

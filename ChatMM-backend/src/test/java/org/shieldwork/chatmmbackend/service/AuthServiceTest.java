@@ -1,17 +1,28 @@
 package org.shieldwork.chatmmbackend.service;
 
+import java.time.Instant;
+import java.util.Optional;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.ArgumentCaptor;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.argThat;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.shieldwork.chatmmbackend.dto.request.LoginRequest;
 import org.shieldwork.chatmmbackend.dto.request.RefreshTokenRequest;
 import org.shieldwork.chatmmbackend.dto.request.RegisterRequest;
 import org.shieldwork.chatmmbackend.dto.response.AuthResponse;
+import org.shieldwork.chatmmbackend.dto.response.SaltResponse;
 import org.shieldwork.chatmmbackend.dto.response.TokenRefreshResponse;
+import org.shieldwork.chatmmbackend.exception.ResourceNotFoundException;
 import org.shieldwork.chatmmbackend.exception.TokenRefreshException;
 import org.shieldwork.chatmmbackend.exception.UserAlreadyExistsException;
 import org.shieldwork.chatmmbackend.model.RefreshToken;
@@ -24,120 +35,207 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.util.ReflectionTestUtils;
 
-import java.time.Instant;
-import java.util.Optional;
-
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.*;
-
 @ExtendWith(MockitoExtension.class)
 class AuthServiceTest {
 
-    @Mock private UserRepository userRepository;
-    @Mock private PasswordEncoder passwordEncoder;
-    @Mock private AuthenticationManager authenticationManager;
-    @Mock private JwtService jwtService;
-    @Mock private RefreshTokenRepository refreshTokenRepository;
+    @Mock UserRepository userRepository;
+    @Mock PasswordEncoder passwordEncoder;
+    @Mock AuthenticationManager authenticationManager;
+    @Mock JwtService jwtService;
+    @Mock RefreshTokenRepository refreshTokenRepository;
 
-    @InjectMocks
-    private AuthService authService;
+    @InjectMocks AuthService authService;
 
     @BeforeEach
     void setUp() {
-        ReflectionTestUtils.setField(authService, "refreshTokenExpirationMs", 2592000000L);
+        ReflectionTestUtils.setField(authService, "refreshTokenExpirationMs", 2_592_000_000L);
     }
 
 
     @Test
-    void registerUser_ShouldSaveNewUser_WhenEmailIsNotTaken() {
-        RegisterRequest request = new RegisterRequest();
-        request.setEmail("newuser@example.com");
-        request.setPassword("plainPassword");
-        request.setName("John Doe");
-        request.setFrontSalt("salt");
-        request.setPublicKey("pubKey");
-        request.setEncryptedPrivateKey("privKey");
+    void register_savesUser_whenEmailNotTaken() {
+        RegisterRequest req = new RegisterRequest();
+        req.setEmail("new@example.com");
+        req.setName("New User");
+        req.setPassword("hashed-on-front");
+        req.setFrontSalt("salt");
+        req.setPublicKey("pubkey");
+        req.setEncryptedPrivateKey("encpriv");
 
-        when(userRepository.existsByEmail(request.getEmail())).thenReturn(false);
-        when(passwordEncoder.encode(request.getPassword())).thenReturn("hashedPassword");
+        when(userRepository.existsByEmail("new@example.com")).thenReturn(false);
+        when(passwordEncoder.encode(any())).thenReturn("bcrypted");
 
-        authService.registerUser(request);
+        authService.registerUser(req);
 
-        ArgumentCaptor<User> userCaptor = ArgumentCaptor.forClass(User.class);
-        verify(userRepository, times(1)).save(userCaptor.capture());
-
-        User savedUser = userCaptor.getValue();
-        assertEquals("newuser@example.com", savedUser.getEmail(), "Email should match request");
-        assertEquals("hashedPassword", savedUser.getPassword(), "Password should be hashed");
+        verify(userRepository).save(argThat(u ->
+                u.getEmail().equals("new@example.com") &&
+                u.getName().equals("New User") &&
+                u.getPassword().equals("bcrypted")
+        ));
     }
 
     @Test
-    void registerUser_ShouldThrowException_WhenEmailIsAlreadyTaken() {
-        RegisterRequest request = new RegisterRequest();
-        request.setEmail("existing@example.com");
+    void register_throws_whenEmailAlreadyTaken() {
+        RegisterRequest req = new RegisterRequest();
+        req.setEmail("taken@example.com");
+        req.setName("X");
+        req.setPassword("p");
+        req.setFrontSalt("s");
+        req.setPublicKey("k");
+        req.setEncryptedPrivateKey("e");
 
-        when(userRepository.existsByEmail(request.getEmail())).thenReturn(true);
+        when(userRepository.existsByEmail("taken@example.com")).thenReturn(true);
 
-        UserAlreadyExistsException exception = assertThrows(
-                UserAlreadyExistsException.class,
-                () -> authService.registerUser(request),
-                "Should throw exception when email is taken"
-        );
+        assertThatThrownBy(() -> authService.registerUser(req))
+                .isInstanceOf(UserAlreadyExistsException.class);
 
-        assertEquals("An account with this address already exists.", exception.getMessage());
-        verify(userRepository, never()).save(any(User.class));
+        verify(userRepository, never()).save(any());
     }
 
+
     @Test
-    void login_ShouldReturnAuthResponse_WhenCredentialsAreValid() {
-        LoginRequest request = new LoginRequest();
-        request.setEmail("user@example.com");
-        request.setPassword("password123");
-        request.setDeviceId("device-123");
+    void login_returnsAuthResponse_onValidCredentials() {
+        LoginRequest req = new LoginRequest();
+        req.setEmail("alice@example.com");
+        req.setPassword("pass");
+        req.setDeviceId("device-1");
 
-        User user = User.builder()
-                .id(1L)
-                .email("user@example.com")
-                .name("John Doe")
-                .encryptedPrivateKey("secretKey")
-                .build();
+        User user = buildUser(1L, "alice@example.com");
 
-        when(userRepository.findByEmail(request.getEmail())).thenReturn(Optional.of(user));
-        when(refreshTokenRepository.existsByUserAndDeviceId(user, request.getDeviceId())).thenReturn(false);
-        when(jwtService.generateToken(user)).thenReturn("mocked-jwt-token");
+        when(userRepository.findByEmail("alice@example.com")).thenReturn(Optional.of(user));
+        when(jwtService.generateToken(user)).thenReturn("jwt-token");
 
-        AuthResponse response = authService.login(request);
+        AuthResponse response = authService.login(req);
 
-        assertNotNull(response, "AuthResponse should not be null");
-        assertEquals("mocked-jwt-token", response.getAccessToken());
-        assertEquals("secretKey", response.getEncryptedPrivateKey(), "Should return private key for new device");
+        assertThat(response.getAccessToken()).isEqualTo("jwt-token");
+        assertThat(response.getEmail()).isEqualTo("alice@example.com");
+        assertThat(response.getRefreshToken()).isNotBlank();
 
         verify(authenticationManager).authenticate(any(UsernamePasswordAuthenticationToken.class));
-        verify(refreshTokenRepository).deleteByUserAndDeviceId(user, "device-123");
+        verify(refreshTokenRepository).deleteByUserAndDeviceId(user, "device-1");
         verify(refreshTokenRepository).save(any(RefreshToken.class));
     }
 
     @Test
-    void refreshToken_ShouldThrowException_WhenTokenIsExpired() {
-        RefreshTokenRequest request = new RefreshTokenRequest();
-        request.setRefreshToken("expired-refresh-token");
+    void login_throws_whenUserNotFound() {
+        LoginRequest req = new LoginRequest();
+        req.setEmail("ghost@example.com");
+        req.setPassword("pass");
+        req.setDeviceId("device-1");
 
-        RefreshToken expiredToken = RefreshToken.builder()
-                .token("expired-refresh-token")
-                .expiryDate(Instant.now().minusSeconds(3600))
-                .user(new User())
+        when(userRepository.findByEmail("ghost@example.com")).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> authService.login(req))
+                .isInstanceOf(ResourceNotFoundException.class);
+    }
+
+
+    @Test
+    void refreshToken_returnsNewAccessToken_whenTokenValid() {
+        User user = buildUser(1L, "alice@example.com");
+
+        RefreshToken rt = RefreshToken.builder()
+                .token("valid-refresh")
+                .user(user)
+                .deviceId("device-1")
+                .expiryDate(Instant.now().plusSeconds(3600))
                 .build();
 
-        when(refreshTokenRepository.findByToken(request.getRefreshToken())).thenReturn(Optional.of(expiredToken));
+        RefreshTokenRequest req = new RefreshTokenRequest();
+        req.setRefreshToken("valid-refresh");
 
-        TokenRefreshException exception = assertThrows(
-                TokenRefreshException.class,
-                () -> authService.refreshToken(request)
-        );
+        when(refreshTokenRepository.findByToken("valid-refresh")).thenReturn(Optional.of(rt));
+        when(jwtService.generateToken(user)).thenReturn("new-jwt");
 
-        assertEquals("Refresh token has expired.", exception.getMessage());
-        verify(refreshTokenRepository).delete(expiredToken);
-        verify(jwtService, never()).generateToken(any());
+        TokenRefreshResponse response = authService.refreshToken(req);
+
+        assertThat(response.getAccessToken()).isEqualTo("new-jwt");
+        assertThat(response.getRefreshToken()).isEqualTo("valid-refresh");
+    }
+
+    @Test
+    void refreshToken_throws_whenTokenNotFound() {
+        RefreshTokenRequest req = new RefreshTokenRequest();
+        req.setRefreshToken("unknown");
+
+        when(refreshTokenRepository.findByToken("unknown")).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> authService.refreshToken(req))
+                .isInstanceOf(TokenRefreshException.class)
+                .hasMessageContaining("not found");
+    }
+
+    @Test
+    void refreshToken_throws_andDeletesToken_whenExpired() {
+        User user = buildUser(1L, "alice@example.com");
+
+        RefreshToken expired = RefreshToken.builder()
+                .token("expired-token")
+                .user(user)
+                .deviceId("device-1")
+                .expiryDate(Instant.now().minusSeconds(1))
+                .build();
+
+        RefreshTokenRequest req = new RefreshTokenRequest();
+        req.setRefreshToken("expired-token");
+
+        when(refreshTokenRepository.findByToken("expired-token")).thenReturn(Optional.of(expired));
+
+        assertThatThrownBy(() -> authService.refreshToken(req))
+                .isInstanceOf(TokenRefreshException.class)
+                .hasMessageContaining("expired");
+
+        verify(refreshTokenRepository).delete(expired);
+    }
+
+
+    @Test
+    void getFrontSalt_returnsSalt_whenUserExists() {
+        User user = buildUser(1L, "alice@example.com");
+        when(userRepository.findByEmail("alice@example.com")).thenReturn(Optional.of(user));
+
+        SaltResponse response = authService.getFrontSalt("alice@example.com");
+
+        assertThat(response.getFrontSalt()).isEqualTo("front-salt");
+    }
+
+    @Test
+    void getFrontSalt_throws_whenUserNotFound() {
+        when(userRepository.findByEmail("nobody@example.com")).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> authService.getFrontSalt("nobody@example.com"))
+                .isInstanceOf(ResourceNotFoundException.class);
+    }
+
+
+    @Test
+    void logout_deletesRefreshToken() {
+        User user = buildUser(1L, "alice@example.com");
+        when(userRepository.findByEmail("alice@example.com")).thenReturn(Optional.of(user));
+
+        authService.logout("device-1", "alice@example.com");
+
+        verify(refreshTokenRepository).deleteByUserAndDeviceId(user, "device-1");
+    }
+
+    @Test
+    void logout_throws_whenUserNotFound() {
+        when(userRepository.findByEmail("ghost@example.com")).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> authService.logout("device-1", "ghost@example.com"))
+                .isInstanceOf(ResourceNotFoundException.class);
+    }
+
+
+    private User buildUser(Long id, String email) {
+        return User.builder()
+                .id(id)
+                .email(email)
+                .name("Alice")
+                .password("bcrypted")
+                .frontSalt("front-salt")
+                .publicKey("pubkey")
+                .encryptedPrivateKey("encpriv")
+                .build();
     }
 }

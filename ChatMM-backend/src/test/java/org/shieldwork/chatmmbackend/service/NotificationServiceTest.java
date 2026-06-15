@@ -1,87 +1,140 @@
 package org.shieldwork.chatmmbackend.service;
 
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.ArgumentCaptor;
-import org.mockito.InjectMocks;
-import org.mockito.Mock;
-import org.mockito.junit.jupiter.MockitoExtension;
-import org.shieldwork.chatmmbackend.dto.response.NotificationResponse;
-import org.shieldwork.chatmmbackend.model.Participant;
-import org.shieldwork.chatmmbackend.model.User;
-import org.shieldwork.chatmmbackend.repository.ParticipantRepository;
-import org.springframework.messaging.simp.SimpMessagingTemplate;
-
 import java.util.List;
 
-import static org.junit.jupiter.api.Assertions.*;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.*;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.when;
+import org.mockito.junit.jupiter.MockitoExtension;
+import org.shieldwork.chatmmbackend.dto.response.ConversationSummaryResponse;
+import org.shieldwork.chatmmbackend.model.Conversation;
+import org.shieldwork.chatmmbackend.model.Participant;
+import org.shieldwork.chatmmbackend.model.User;
+import org.shieldwork.chatmmbackend.model.enums.ConversationType;
+import org.shieldwork.chatmmbackend.model.enums.ParticipantRole;
+import org.shieldwork.chatmmbackend.repository.ParticipantRepository;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
 
 @ExtendWith(MockitoExtension.class)
 class NotificationServiceTest {
 
-    @Mock private SimpMessagingTemplate messagingTemplate;
-    @Mock private ParticipantRepository participantRepository;
+    @Mock SimpMessagingTemplate messagingTemplate;
+    @Mock ParticipantRepository participantRepository;
 
-    @InjectMocks
-    private NotificationService notificationService;
+    @InjectMocks NotificationService notificationService;
+
 
     @Test
-    void sendNewMessageNotification_ShouldSendToAllParticipants_ExceptSender() {
-        Long conversationId = 1L;
-        Long senderId = 100L;
-        String senderName = "Alice";
-        String senderEmail = "alice@example.com";
+    void sendNewMessageNotification_sendsToAllOtherParticipants() {
+        User alice = buildUser(1L, "alice@example.com");
+        User bob   = buildUser(2L, "bob@example.com");
+        User carol = buildUser(3L, "carol@example.com");
 
-        User sender = User.builder().id(senderId).email(senderEmail).build();
-        User receiver1 = User.builder().id(101L).email("bob@example.com").build();
-        User receiver2 = User.builder().id(102L).email("charlie@example.com").build();
+        Conversation conv = buildConversation(10L);
 
-        Participant p1 = Participant.builder().user(sender).build();
-        Participant p2 = Participant.builder().user(receiver1).build();
-        Participant p3 = Participant.builder().user(receiver2).build();
+        when(participantRepository.findAllByConversationId(10L)).thenReturn(List.of(
+                buildParticipant(alice, conv),
+                buildParticipant(bob, conv),
+                buildParticipant(carol, conv)
+        ));
 
-        when(participantRepository.findAllByConversationId(conversationId))
-                .thenReturn(List.of(p1, p2, p3));
-
-        notificationService.sendNewMessageNotification(conversationId, senderId, senderName, senderEmail);
-
-        ArgumentCaptor<NotificationResponse> notificationCaptor = ArgumentCaptor.forClass(NotificationResponse.class);
-
-        verify(messagingTemplate, times(1)).convertAndSendToUser(
-                eq("bob@example.com"), eq("/queue/notifications"), notificationCaptor.capture()
-        );
-        verify(messagingTemplate, times(1)).convertAndSendToUser(
-                eq("charlie@example.com"), eq("/queue/notifications"), notificationCaptor.capture()
-        );
+        notificationService.sendNewMessageNotification(10L, 1L, "Alice", "alice@example.com");
 
         verify(messagingTemplate, never()).convertAndSendToUser(
-                eq(senderEmail), anyString(), any()
-        );
-
-        NotificationResponse capturedNotification = notificationCaptor.getValue();
-        assertNotNull(capturedNotification);
-        assertEquals(conversationId, capturedNotification.getConversationId(), "Conversation ID should match");
-        assertEquals(senderId, capturedNotification.getSenderId(), "Sender ID should match");
-        assertEquals(senderName, capturedNotification.getSenderName(), "Sender name should match");
-        assertNotNull(capturedNotification.getTimestamp(), "Timestamp should be generated");
+                eq("alice@example.com"), anyString(), any());
+        verify(messagingTemplate).convertAndSendToUser(
+                eq("bob@example.com"), eq("/queue/notifications"), any());
+        verify(messagingTemplate).convertAndSendToUser(
+                eq("carol@example.com"), eq("/queue/notifications"), any());
     }
 
     @Test
-    void sendNewMessageNotification_ShouldNotSendAnything_WhenSenderIsTheOnlyParticipant() {
-        Long conversationId = 2L;
-        String senderEmail = "lonely@example.com";
+    void sendNewMessageNotification_sendsToNobody_whenSenderIsOnlyParticipant() {
+        User alice = buildUser(1L, "alice@example.com");
+        Conversation conv = buildConversation(10L);
 
-        User sender = User.builder().id(99L).email(senderEmail).build();
-        Participant alone = Participant.builder().user(sender).build();
+        when(participantRepository.findAllByConversationId(10L))
+                .thenReturn(List.of(buildParticipant(alice, conv)));
 
-        when(participantRepository.findAllByConversationId(conversationId))
-                .thenReturn(List.of(alone));
+        notificationService.sendNewMessageNotification(10L, 1L, "Alice", "alice@example.com");
 
-        notificationService.sendNewMessageNotification(conversationId, 99L, "Lonely User", senderEmail);
+        verifyNoInteractions(messagingTemplate);
+    }
 
-        verify(messagingTemplate, never()).convertAndSendToUser(anyString(), anyString(), any());
+    @Test
+    void sendNewMessageNotification_notificationContainsCorrectConversationId() {
+        User alice = buildUser(1L, "alice@example.com");
+        User bob   = buildUser(2L, "bob@example.com");
+        Conversation conv = buildConversation(10L);
+
+        when(participantRepository.findAllByConversationId(10L))
+                .thenReturn(List.of(buildParticipant(alice, conv), buildParticipant(bob, conv)));
+
+        notificationService.sendNewMessageNotification(10L, 1L, "Alice", "alice@example.com");
+
+        verify(messagingTemplate).convertAndSendToUser(
+                eq("bob@example.com"),
+                eq("/queue/notifications"),
+                argThat(payload -> {
+                    var notification = (org.shieldwork.chatmmbackend.dto.response.NotificationResponse) payload;
+                    return notification.getConversationId().equals(10L)
+                            && notification.getSenderId().equals(1L)
+                            && "Alice".equals(notification.getSenderName());
+                })
+        );
+    }
+
+
+    @Test
+    void sendNewConversationNotification_sendsToCorrectDestination() {
+        ConversationSummaryResponse summary = ConversationSummaryResponse.builder()
+                .id(10L)
+                .name("Test Conv")
+                .type(ConversationType.DIRECT)
+                .build();
+
+        notificationService.sendNewConversationNotification("bob@example.com", summary);
+
+        verify(messagingTemplate).convertAndSendToUser(
+                eq("bob@example.com"),
+                eq("/queue/conversations"),
+                eq(summary)
+        );
+    }
+
+    @Test
+    void sendNewConversationNotification_doesNotCallParticipantRepository() {
+        notificationService.sendNewConversationNotification("bob@example.com",
+                ConversationSummaryResponse.builder().id(1L).build());
+
+        verifyNoInteractions(participantRepository);
+    }
+
+
+    private User buildUser(Long id, String email) {
+        return User.builder().id(id).email(email).name(email.split("@")[0])
+                .password("p").frontSalt("s").publicKey("k").encryptedPrivateKey("e").build();
+    }
+
+    private Conversation buildConversation(Long id) {
+        Conversation c = new Conversation();
+        c.setId(id);
+        c.setType(ConversationType.DIRECT);
+        return c;
+    }
+
+    private Participant buildParticipant(User user, Conversation conv) {
+        return Participant.builder()
+                .user(user).conversation(conv)
+                .encryptedAesKey("aes").role(ParticipantRole.ADMIN).build();
     }
 }

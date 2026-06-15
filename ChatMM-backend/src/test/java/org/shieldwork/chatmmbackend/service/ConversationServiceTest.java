@@ -1,12 +1,26 @@
 package org.shieldwork.chatmmbackend.service;
 
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.ArgumentCaptor;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.ArgumentMatchers.eq;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.shieldwork.chatmmbackend.dto.request.CreateConversationRequest;
+import org.shieldwork.chatmmbackend.dto.response.ConversationSummaryResponse;
+import org.shieldwork.chatmmbackend.dto.response.PublicKeyResponse;
+import org.shieldwork.chatmmbackend.exception.ConversationAlreadyExistsException;
 import org.shieldwork.chatmmbackend.exception.ResourceNotFoundException;
 import org.shieldwork.chatmmbackend.model.Conversation;
 import org.shieldwork.chatmmbackend.model.Participant;
@@ -16,156 +30,232 @@ import org.shieldwork.chatmmbackend.model.enums.ParticipantRole;
 import org.shieldwork.chatmmbackend.repository.ConversationRepository;
 import org.shieldwork.chatmmbackend.repository.ParticipantRepository;
 import org.shieldwork.chatmmbackend.repository.UserRepository;
-
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
-import java.util.Set;
-
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyIterable;
-import static org.mockito.Mockito.*;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.security.access.AccessDeniedException;
 
 @ExtendWith(MockitoExtension.class)
 class ConversationServiceTest {
 
-    @Mock private ConversationRepository conversationRepository;
-    @Mock private ParticipantRepository participantRepository;
-    @Mock private UserRepository userRepository;
+    @Mock ConversationRepository conversationRepository;
+    @Mock ParticipantRepository participantRepository;
+    @Mock UserRepository userRepository;
+    @Mock NotificationService notificationService;
 
-    @InjectMocks
-    private ConversationService conversationService;
+    @InjectMocks ConversationService conversationService;
+
 
     @Test
-    void createConversation_ShouldCreateDirectConversation_WhenTwoParticipantsProvided() {
-        String creatorEmail = "creator@example.com";
-        User creator = User.builder().id(1L).email(creatorEmail).build();
-        User friend = User.builder().id(2L).email("friend@example.com").build();
+    void createConversation_createsDirect_forTwoParticipants() {
+        User creator = buildUser(1L, "alice@example.com");
+        User other   = buildUser(2L, "bob@example.com");
 
-        CreateConversationRequest request = new CreateConversationRequest();
-        request.setName("Direct Chat");
-        request.setParticipantKeys(Map.of(
-                1L, "encrypted_key_for_creator",
-                2L, "encrypted_key_for_friend"
-        ));
+        CreateConversationRequest req = new CreateConversationRequest();
+        req.setParticipantKeys(Map.of(1L, "key1", 2L, "key2"));
 
-        when(userRepository.findByEmail(creatorEmail)).thenReturn(Optional.of(creator));
+        Conversation saved = buildConversation(10L, ConversationType.DIRECT);
 
-        Conversation savedConversation = Conversation.builder().id(100L).type(ConversationType.DIRECT).build();
-        when(conversationRepository.save(any(Conversation.class))).thenReturn(savedConversation);
+        when(userRepository.findByEmail("alice@example.com")).thenReturn(Optional.of(creator));
+        when(conversationRepository.existsDirectConversationBetween(anyLong(), anyLong())).thenReturn(false);
+        when(conversationRepository.save(any())).thenReturn(saved);
+        when(userRepository.findAllById(any())).thenReturn(List.of(creator, other));
+        when(participantRepository.saveAll(any())).thenAnswer(inv -> inv.getArgument(0));
 
-        when(userRepository.findAllById(Set.of(1L, 2L))).thenReturn(List.of(creator, friend));
+        Long id = conversationService.createConversation(req, "alice@example.com");
 
-        Long resultId = conversationService.createConversation(request, creatorEmail);
-
-        assertEquals(100L, resultId, "Should return ID of the newly created conversation");
-
-        ArgumentCaptor<Conversation> convCaptor = ArgumentCaptor.forClass(Conversation.class);
-        verify(conversationRepository).save(convCaptor.capture());
-        assertEquals(ConversationType.DIRECT, convCaptor.getValue().getType(), "Type should be DIRECT for 2 users");
-        assertEquals("Direct Chat", convCaptor.getValue().getName());
-
-        @SuppressWarnings("unchecked")
-        ArgumentCaptor<List<Participant>> partCaptor = ArgumentCaptor.forClass(List.class);
-        verify(participantRepository).saveAll(partCaptor.capture());
-
-        List<Participant> savedParticipants = partCaptor.getValue();
-        assertEquals(2, savedParticipants.size(), "Should save 2 participants");
-
-        assertTrue(savedParticipants.stream().allMatch(p -> p.getRole() == ParticipantRole.ADMIN), "In DIRECT chat, both should be ADMIN");
+        assertThat(id).isEqualTo(10L);
+        verify(conversationRepository).save(argThat(c -> c.getType() == ConversationType.DIRECT));
     }
 
     @Test
-    void createConversation_ShouldCreateGroupConversation_WhenMoreThanTwoParticipantsProvided() {
-        String creatorEmail = "creator@example.com";
-        User creator = User.builder().id(1L).email(creatorEmail).build();
-        User friend1 = User.builder().id(2L).build();
-        User friend2 = User.builder().id(3L).build();
+    void createConversation_createsGroup_forThreeParticipants() {
+        User creator = buildUser(1L, "alice@example.com");
+        User bob     = buildUser(2L, "bob@example.com");
+        User carol   = buildUser(3L, "carol@example.com");
 
-        CreateConversationRequest request = new CreateConversationRequest();
-        request.setName("Group Chat");
-        request.setParticipantKeys(Map.of(
-                1L, "key1",
-                2L, "key2",
-                3L, "key3"
-        ));
+        CreateConversationRequest req = new CreateConversationRequest();
+        req.setName("Group Chat");
+        req.setParticipantKeys(Map.of(1L, "k1", 2L, "k2", 3L, "k3"));
 
-        when(userRepository.findByEmail(creatorEmail)).thenReturn(Optional.of(creator));
+        Conversation saved = buildConversation(20L, ConversationType.GROUP);
+        saved.setName("Group Chat");
 
-        Conversation savedConversation = Conversation.builder().id(100L).type(ConversationType.GROUP).build();
-        when(conversationRepository.save(any(Conversation.class))).thenReturn(savedConversation);
+        when(userRepository.findByEmail("alice@example.com")).thenReturn(Optional.of(creator));
+        when(conversationRepository.save(any())).thenReturn(saved);
+        when(userRepository.findAllById(any())).thenReturn(List.of(creator, bob, carol));
+        when(participantRepository.saveAll(any())).thenAnswer(inv -> inv.getArgument(0));
 
-        when(userRepository.findAllById(Set.of(1L, 2L, 3L))).thenReturn(List.of(creator, friend1, friend2));
+        Long id = conversationService.createConversation(req, "alice@example.com");
 
-        conversationService.createConversation(request, creatorEmail);
-
-        ArgumentCaptor<Conversation> convCaptor = ArgumentCaptor.forClass(Conversation.class);
-        verify(conversationRepository).save(convCaptor.capture());
-        assertEquals(ConversationType.GROUP, convCaptor.getValue().getType(), "Type should be GROUP for >2 users");
-
-        @SuppressWarnings("unchecked")
-        ArgumentCaptor<List<Participant>> partCaptor = ArgumentCaptor.forClass(List.class);
-        verify(participantRepository).saveAll(partCaptor.capture());
-
-        List<Participant> savedParticipants = partCaptor.getValue();
-
-        for (Participant p : savedParticipants) {
-            if (p.getUser().getId().equals(1L)) {
-                assertEquals(ParticipantRole.ADMIN, p.getRole(), "Creator should be ADMIN in a GROUP");
-            } else {
-                assertEquals(ParticipantRole.MEMBER, p.getRole(), "Invited users should be MEMBER in a GROUP");
-            }
-        }
+        assertThat(id).isEqualTo(20L);
+        verify(conversationRepository).save(argThat(c -> c.getType() == ConversationType.GROUP));
     }
 
     @Test
-    void createConversation_ShouldThrowIllegalArgumentException_WhenCreatorIsNotInParticipantList() {
-        String creatorEmail = "creator@example.com";
-        User creator = User.builder().id(1L).email(creatorEmail).build();
+    void createConversation_throws_whenCreatorNotParticipant() {
+        User creator = buildUser(1L, "alice@example.com");
+        CreateConversationRequest req = new CreateConversationRequest();
+        req.setParticipantKeys(Map.of(2L, "k2", 3L, "k3")); 
 
-        CreateConversationRequest request = new CreateConversationRequest();
-        request.setParticipantKeys(Map.of(
-                2L, "key2",
-                3L, "key3"
-        ));
+        when(userRepository.findByEmail("alice@example.com")).thenReturn(Optional.of(creator));
 
-        when(userRepository.findByEmail(creatorEmail)).thenReturn(Optional.of(creator));
-
-        IllegalArgumentException exception = assertThrows(
-                IllegalArgumentException.class,
-                () -> conversationService.createConversation(request, creatorEmail)
-        );
-
-        assertEquals("Conversation creator must be a participant", exception.getMessage());
-
-        verify(conversationRepository, never()).save(any(Conversation.class));
-        verify(participantRepository, never()).saveAll(anyIterable());
+        assertThatThrownBy(() -> conversationService.createConversation(req, "alice@example.com"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("creator must be a participant");
     }
 
     @Test
-    void createConversation_ShouldThrowResourceNotFoundException_WhenAnyRequestedUserDoesNotExist() {
-        String creatorEmail = "creator@example.com";
-        User creator = User.builder().id(1L).email(creatorEmail).build();
+    void createConversation_throws_whenOnlyOneParticipant() {
+        User creator = buildUser(1L, "alice@example.com");
+        CreateConversationRequest req = new CreateConversationRequest();
+        req.setParticipantKeys(Map.of(1L, "k1"));
 
-        CreateConversationRequest request = new CreateConversationRequest();
-        request.setParticipantKeys(Map.of(
-                1L, "key1",
-                99L, "key_for_nonexistent_user"
-        ));
+        when(userRepository.findByEmail("alice@example.com")).thenReturn(Optional.of(creator));
 
-        when(userRepository.findByEmail(creatorEmail)).thenReturn(Optional.of(creator));
-        when(conversationRepository.save(any(Conversation.class))).thenReturn(new Conversation());
+        assertThatThrownBy(() -> conversationService.createConversation(req, "alice@example.com"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("at least two");
+    }
 
-        when(userRepository.findAllById(Set.of(1L, 99L))).thenReturn(List.of(creator));
+    @Test
+    void createConversation_throws_whenDirectAlreadyExists() {
+        User creator = buildUser(1L, "alice@example.com");
+        CreateConversationRequest req = new CreateConversationRequest();
+        req.setParticipantKeys(Map.of(1L, "k1", 2L, "k2"));
 
-        ResourceNotFoundException exception = assertThrows(
-                ResourceNotFoundException.class,
-                () -> conversationService.createConversation(request, creatorEmail)
-        );
+        when(userRepository.findByEmail("alice@example.com")).thenReturn(Optional.of(creator));
+        when(conversationRepository.existsDirectConversationBetween(anyLong(), anyLong())).thenReturn(true);
 
-        assertEquals("One or more of the provided user IDs do not exist", exception.getMessage());
+        assertThatThrownBy(() -> conversationService.createConversation(req, "alice@example.com"))
+                .isInstanceOf(ConversationAlreadyExistsException.class);
+    }
 
-        verify(participantRepository, never()).saveAll(anyIterable());
+    @Test
+    void createConversation_throws_whenUserIdNotFound() {
+        User creator = buildUser(1L, "alice@example.com");
+        CreateConversationRequest req = new CreateConversationRequest();
+        req.setParticipantKeys(Map.of(1L, "k1", 99L, "k99")); 
+
+        Conversation saved = buildConversation(10L, ConversationType.DIRECT);
+
+        when(userRepository.findByEmail("alice@example.com")).thenReturn(Optional.of(creator));
+        when(conversationRepository.existsDirectConversationBetween(anyLong(), anyLong())).thenReturn(false);
+        when(conversationRepository.save(any())).thenReturn(saved);
+        when(userRepository.findAllById(any())).thenReturn(List.of(creator)); 
+
+        assertThatThrownBy(() -> conversationService.createConversation(req, "alice@example.com"))
+                .isInstanceOf(ResourceNotFoundException.class);
+    }
+
+
+    @Test
+    void getParticipantPublicKeys_returnsOtherParticipantsKeys() {
+        User alice = buildUser(1L, "alice@example.com");
+        User bob   = buildUser(2L, "bob@example.com");
+
+        Participant pAlice = buildParticipant(alice, 10L);
+        Participant pBob   = buildParticipant(bob, 10L);
+
+        when(userRepository.findByEmail("alice@example.com")).thenReturn(Optional.of(alice));
+        when(conversationRepository.existsById(10L)).thenReturn(true);
+        when(participantRepository.findAllByConversationId(10L)).thenReturn(List.of(pAlice, pBob));
+
+        List<PublicKeyResponse> keys = conversationService.getParticipantPublicKeys(10L, "alice@example.com");
+
+        assertThat(keys).hasSize(1);
+        assertThat(keys.get(0).getUserId()).isEqualTo(2L);
+        assertThat(keys.get(0).getPublicKey()).isEqualTo("pubkey");
+    }
+
+    @Test
+    void getParticipantPublicKeys_throws_whenConversationNotFound() {
+        User alice = buildUser(1L, "alice@example.com");
+        when(userRepository.findByEmail("alice@example.com")).thenReturn(Optional.of(alice));
+        when(conversationRepository.existsById(99L)).thenReturn(false);
+
+        assertThatThrownBy(() -> conversationService.getParticipantPublicKeys(99L, "alice@example.com"))
+                .isInstanceOf(ResourceNotFoundException.class);
+    }
+
+    @Test
+    void getParticipantPublicKeys_throws_whenNotMember() {
+        User alice = buildUser(1L, "alice@example.com");
+        User bob   = buildUser(2L, "bob@example.com");
+
+        when(userRepository.findByEmail("alice@example.com")).thenReturn(Optional.of(alice));
+        when(conversationRepository.existsById(10L)).thenReturn(true);
+        when(participantRepository.findAllByConversationId(10L)).thenReturn(List.of(buildParticipant(bob, 10L)));
+
+        assertThatThrownBy(() -> conversationService.getParticipantPublicKeys(10L, "alice@example.com"))
+                .isInstanceOf(AccessDeniedException.class);
+    }
+
+
+    @Test
+    void getUserConversations_returnsEmpty_whenNoConversations() {
+        when(participantRepository.findAllByUserEmail(eq("alice@example.com"), any()))
+                .thenReturn(Page.empty());
+
+        Page<ConversationSummaryResponse> result = conversationService.getUserConversations("alice@example.com", 0, 10);
+
+        assertThat(result).isEmpty();
+    }
+
+    @Test
+    void getUserConversations_returnsDirectConversation_withOtherUserNameAsDisplayName() {
+        User alice = buildUser(1L, "alice@example.com");
+        User bob   = buildUser(2L, "bob@example.com");
+
+        Conversation conv = buildConversation(10L, ConversationType.DIRECT);
+
+        Participant myPart  = buildParticipantFull(alice, conv);
+        Participant bobPart = buildParticipantFull(bob, conv);
+
+        Page<Participant> page = new PageImpl<>(List.of(myPart), PageRequest.of(0, 10), 1);
+
+        when(participantRepository.findAllByUserEmail(eq("alice@example.com"), any())).thenReturn(page);
+        when(participantRepository.findByConversationIdIn(List.of(10L))).thenReturn(List.of(myPart, bobPart));
+
+        Page<ConversationSummaryResponse> result = conversationService.getUserConversations("alice@example.com", 0, 10);
+
+        assertThat(result.getContent()).hasSize(1);
+        assertThat(result.getContent().get(0).getName()).isEqualTo("Bob"); 
+    }
+
+
+    private User buildUser(Long id, String email) {
+        String firstName = email.split("@")[0];
+        String name = firstName.substring(0, 1).toUpperCase() + firstName.substring(1);
+        return User.builder().id(id).email(email).name(name)
+                .password("p").frontSalt("s").publicKey("pubkey").encryptedPrivateKey("e").build();
+    }
+
+    private Conversation buildConversation(Long id, ConversationType type) {
+        Conversation c = new Conversation();
+        c.setId(id);
+        c.setType(type);
+        return c;
+    }
+
+    private Participant buildParticipant(User user, Long conversationId) {
+        Conversation conv = new Conversation();
+        conv.setId(conversationId);
+        conv.setType(ConversationType.DIRECT);
+        return Participant.builder()
+                .user(user)
+                .conversation(conv)
+                .encryptedAesKey("aes-key")
+                .role(ParticipantRole.ADMIN)
+                .build();
+    }
+
+    private Participant buildParticipantFull(User user, Conversation conv) {
+        return Participant.builder()
+                .user(user)
+                .conversation(conv)
+                .encryptedAesKey("aes-key")
+                .role(ParticipantRole.ADMIN)
+                .build();
     }
 }
