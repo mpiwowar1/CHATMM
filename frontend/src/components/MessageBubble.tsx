@@ -22,7 +22,7 @@ export function MessageBubble({
         <span className="mb-1 text-[10px] text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100">
           {timeStr}
         </span>
-        <div className="max-w-[65%] rounded-2xl rounded-br-sm bg-primary px-4 py-2 text-sm leading-relaxed text-primary-foreground shadow-sm">
+        <div className="max-w-[65%] rounded-2xl rounded-br-sm bg-primary px-4 py-2 text-sm leading-relaxed break-words whitespace-pre-wrap text-primary-foreground shadow-sm">
           {message.failed ? (
             <span className="italic opacity-70">[decryption failed]</span>
           ) : (
@@ -47,7 +47,7 @@ export function MessageBubble({
             {message.senderName}
           </p>
         )}
-        <div className="rounded-2xl rounded-bl-sm bg-muted px-4 py-2 text-sm leading-relaxed shadow-sm">
+        <div className="rounded-2xl rounded-bl-sm bg-muted px-4 py-2 text-sm leading-relaxed break-words whitespace-pre-wrap shadow-sm">
           {message.failed ? (
             <span className="italic opacity-70">[decryption failed]</span>
           ) : (

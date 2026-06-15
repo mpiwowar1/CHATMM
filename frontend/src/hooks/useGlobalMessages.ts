@@ -10,7 +10,7 @@ import {
   decryptConversationKey,
   decryptMessage,
 } from "@/encryption/messageCrypto"
-import { toWsUrl, getToken } from "@/encryption/utils"
+import { toWsUrl, getToken, refreshToken } from "@/encryption/utils"
 import type { ConversationSummaryResponse } from "@/components/chat-types"
 
 type RawMessage = {
@@ -133,7 +133,21 @@ export function useGlobalMessages(
           onNewConversationRef.current(newConv)
         })
       },
-      onStompError: (frame) => console.error("Global STOMP error", frame),
+      onStompError: async (frame) => {
+        console.error("Global STOMP error", frame)
+        const ok = await refreshToken(4, 500)
+        if (!ok) return
+
+        const newToken = getToken()
+        if (!newToken) return
+
+        try {
+          client.deactivate()
+        } catch {}
+
+        client.connectHeaders = { Authorization: `Bearer ${newToken}` }
+        client.activate()
+      },
       onWebSocketClose: () => console.info("Global STOMP disconnected"),
     })
 

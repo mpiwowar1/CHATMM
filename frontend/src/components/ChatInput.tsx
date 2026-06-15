@@ -8,7 +8,7 @@ export function ChatInput({ onSend }: { onSend: (plaintext: string) => void }) {
   const [value, setValue] = useState("")
 
   const handleSend = () => {
-    const trimmed = value.trim()
+    const trimmed = value.trim().slice(0, 2000)
     if (!trimmed) return
     onSend(trimmed)
     setValue("")
@@ -19,7 +19,8 @@ export function ChatInput({ onSend }: { onSend: (plaintext: string) => void }) {
       <div className="flex items-center gap-2 rounded-xl bg-muted px-3 py-1.5">
         <Input
           value={value}
-          onChange={(e) => setValue(e.target.value)}
+          maxLength={2000}
+          onChange={(e) => setValue(e.target.value.slice(0, 2000))}
           onKeyDown={(e) => {
             if (e.key === "Enter" && !e.shiftKey) {
               e.preventDefault()
