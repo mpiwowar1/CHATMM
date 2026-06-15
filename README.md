@@ -1,6 +1,6 @@
 # ChatMM
 
-ChatMM to szyfrowany komunikator end-to-end zbudowany na Spring Boot 4 (backend), React + TypeScript (frontend) oraz PostgreSQL. Wiadomości są szyfrowane po stronie klienta przy użyciu RSA i AES — serwer przechowuje wyłącznie zaszyfrowany ciphertext i nigdy nie ma dostępu do treści.
+ChatMM to szyfrowany komunikator end-to-end zbudowany na Spring Boot 4 (backend), React + TypeScript (frontend) oraz PostgreSQL. Wiadomości są szyfrowane po stronie klienta przy użyciu RSA i AES - serwer przechowuje wyłącznie zaszyfrowany ciphertext i nigdy nie ma dostępu do treści.
 
 ## Stos technologiczny
 
@@ -20,7 +20,7 @@ ChatMM to szyfrowany komunikator end-to-end zbudowany na Spring Boot 4 (backend)
 - Docker >= 24
 - Docker Compose >= 2.20
 
-### Krok 1 — plik środowiskowy
+### Krok 1 - plik środowiskowy
 
 Skopiuj przykładowy plik i uzupełnij wartości:
 
@@ -41,7 +41,7 @@ Klucz JWT można wygenerować poleceniem:
 openssl rand -base64 64
 ```
 
-### Krok 2 — uruchomienie
+### Krok 2 - uruchomienie
 
 ```bash
 docker compose up --build
@@ -49,7 +49,7 @@ docker compose up --build
 
 Po pierwszym uruchomieniu Docker pobierze obrazy bazowe, skompiluje backend Mavenem i zbuduje frontend Vitem. Może to potrwać kilka minut.
 
-### Krok 3 — dostęp
+### Krok 3 - dostęp
 
 | Usługa    | Adres                        |
 |-----------|------------------------------|
@@ -78,7 +78,7 @@ Pełna lista obsługiwanych zmiennych (`docker-compose.yml` + `.env`):
 | Zmienna                    | Domyślna wartość                                         | Opis                                          |
 |----------------------------|----------------------------------------------------------|-----------------------------------------------|
 | `POSTGRES_PASSWORD`        | `chatmm_password_123`                                    | Hasło do bazy PostgreSQL                      |
-| `JWT_SECRET`               | *(brak bezpiecznego domyślnego — ustaw własny)*          | Klucz podpisywania tokenów JWT (min. 256 bit) |
+| `JWT_SECRET`               | *(brak bezpiecznego domyślnego - ustaw własny)*          | Klucz podpisywania tokenów JWT (min. 256 bit) |
 | `JWT_TOKEN_EXPIRATION`     | `900000`                                                 | Czas życia access tokena w ms (domyślnie 15 min) |
 | `REFRESH_TOKEN_EXPIRATION` | `2592000000`                                             | Czas życia refresh tokena w ms (domyślnie 30 dni) |
 | `ALLOWED_ORIGINS`          | `http://localhost:3000,http://localhost:5173`             | Dozwolone originy dla CORS                    |
@@ -99,7 +99,7 @@ Authorization: Bearer <access_token>
 
 ---
 
-### Autentykacja — `/auth`
+### Autentykacja - `/auth`
 
 #### `POST /auth/register`
 
@@ -124,7 +124,7 @@ Odpowiedź: `201 Created` (brak ciała)
 
 #### `GET /auth/salt?email=`
 
-Pobranie solu użytkownika przed zalogowaniem — wymagane do ponownego zahashowania hasła po stronie klienta.
+Pobranie solu użytkownika przed zalogowaniem - wymagane do ponownego zahashowania hasła po stronie klienta.
 
 Odpowiedź:
 
@@ -203,7 +203,7 @@ Odpowiedź: `204 No Content`
 
 ---
 
-### Użytkownicy — `/users`
+### Użytkownicy - `/users`
 
 Wszystkie endpointy wymagają autoryzacji.
 
@@ -236,7 +236,7 @@ Podpowiedzi użytkowników podczas wpisywania (domyślnie do 5 wyników).
 
 ---
 
-### Konwersacje — `/conversations`
+### Konwersacje - `/conversations`
 
 #### `POST /conversations`
 
@@ -279,8 +279,8 @@ Odpowiedź: strona `Page<ConversationSummaryResponse>` ze standardowymi polami S
 Historia wiadomości dla danej konwersacji (cursor pagination).
 
 Parametry query:
-- `cursor` — ID ostatniej wiadomości (opcjonalny, brak = od najnowszej)
-- `limit` — liczba wiadomości na stronę (domyślnie 50)
+- `cursor` - ID ostatniej wiadomości (opcjonalny, brak = od najnowszej)
+- `limit` - liczba wiadomości na stronę (domyślnie 50)
 
 Odpowiedź:
 
@@ -305,7 +305,7 @@ Odpowiedź:
 
 #### `GET /conversations/{conversationId}/keys`
 
-Klucze publiczne RSA wszystkich uczestników konwersacji — potrzebne do zaszyfrowania klucza sesji przy dodawaniu nowego uczestnika.
+Klucze publiczne RSA wszystkich uczestników konwersacji - potrzebne do zaszyfrowania klucza sesji przy dodawaniu nowego uczestnika.
 
 Odpowiedź:
 
